@@ -1,0 +1,84 @@
+"""devices table repository."""
+
+from __future__ import annotations
+
+import sqlite3
+from dataclasses import dataclass
+
+
+class DuplicateAddressError(ValueError):
+    pass
+
+
+class DeviceNotFoundError(LookupError):
+    pass
+
+
+@dataclass(frozen=True)
+class Device:
+    id: int
+    address: str
+    name: str
+    owner_user_id: int
+    created_at: str
+
+    @classmethod
+    def from_row(cls, row: sqlite3.Row) -> Device:
+        return cls(
+            id=row["id"],
+            address=row["address"],
+            name=row["name"],
+            owner_user_id=row["owner_user_id"],
+            created_at=row["created_at"],
+        )
+
+
+def create(
+    conn: sqlite3.Connection,
+    *,
+    address: str,
+    name: str,
+    owner_user_id: int,
+) -> int:
+    try:
+        cur = conn.execute(
+            "INSERT INTO devices (address, name, owner_user_id) VALUES (?, ?, ?)",
+            (address, name, owner_user_id),
+        )
+    except sqlite3.IntegrityError as e:
+        msg = str(e).upper()
+        if "UNIQUE" in msg:
+            raise DuplicateAddressError(f"address already exists: {address}") from e
+        raise
+    device_id = cur.lastrowid
+    assert device_id is not None
+    return device_id
+
+
+def get_by_id(conn: sqlite3.Connection, device_id: int) -> Device | None:
+    row = conn.execute("SELECT * FROM devices WHERE id = ?", (device_id,)).fetchone()
+    return Device.from_row(row) if row else None
+
+
+def get_by_address(conn: sqlite3.Connection, address: str) -> Device | None:
+    row = conn.execute("SELECT * FROM devices WHERE address = ?", (address,)).fetchone()
+    return Device.from_row(row) if row else None
+
+
+def list_all(conn: sqlite3.Connection) -> list[Device]:
+    rows = conn.execute("SELECT * FROM devices ORDER BY id").fetchall()
+    return [Device.from_row(r) for r in rows]
+
+
+def list_by_owner(conn: sqlite3.Connection, owner_user_id: int) -> list[Device]:
+    rows = conn.execute(
+        "SELECT * FROM devices WHERE owner_user_id = ? ORDER BY id",
+        (owner_user_id,),
+    ).fetchall()
+    return [Device.from_row(r) for r in rows]
+
+
+def delete(conn: sqlite3.Connection, device_id: int) -> None:
+    cur = conn.execute("DELETE FROM devices WHERE id = ?", (device_id,))
+    if cur.rowcount == 0:
+        raise DeviceNotFoundError(f"device not found: id={device_id}")
