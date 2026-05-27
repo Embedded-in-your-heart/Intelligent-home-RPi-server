@@ -45,7 +45,7 @@ class _Cmd:
 # --- Notify delegate: bluepy calls handleNotification on this object ---
 
 
-class _NotifyDelegate(btle.DefaultDelegate):
+class _NotifyDelegate(btle.DefaultDelegate):  # type: ignore[misc]
     def __init__(self) -> None:
         super().__init__()
         # handle (int from bluepy) -> (char_uuid, user callback)

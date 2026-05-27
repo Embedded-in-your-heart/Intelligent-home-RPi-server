@@ -1,29 +1,13 @@
-"""Entry point: `python -m home_server`.
-
-Phase 1 scope: load config, init logging, init DB, start a minimal Flask app
-with a /health endpoint. BLE manager and full web routes come in later phases.
-"""
+"""Entry point: `python -m home_server`."""
 
 from __future__ import annotations
 
 import logging
 
-from flask import Flask
-
 from home_server.config import Config
 from home_server.core.logging import setup_logging
 from home_server.db import connection
-
-
-def create_app(config: Config) -> Flask:
-    app = Flask(__name__)
-    app.config["SECRET_KEY"] = config.secret_key
-
-    @app.get("/health")
-    def health() -> dict[str, str]:
-        return {"status": "ok"}
-
-    return app
+from home_server.web import create_app
 
 
 def main() -> None:
@@ -35,7 +19,9 @@ def main() -> None:
     connection.initialize(config.db_path)
 
     app = create_app(config)
-    log.info("Starting Flask app on %s:%d (debug=%s)", config.host, config.port, config.debug)
+    log.info(
+        "Starting Flask app on %s:%d (debug=%s)", config.host, config.port, config.debug
+    )
     app.run(host=config.host, port=config.port, debug=config.debug, use_reloader=False)
 
 

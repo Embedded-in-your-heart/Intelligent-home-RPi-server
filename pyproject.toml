@@ -48,3 +48,7 @@ python_version = "3.11"
 strict = true
 mypy_path = "src"
 explicit_package_bases = true
+
+[[tool.mypy.overrides]]
+module = ["flask_login.*", "flask_wtf.*", "wtforms.*", "bluepy.*"]
+ignore_missing_imports = true
