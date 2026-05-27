@@ -89,19 +89,22 @@ task clean           # 清除 caches 與 dev SQLite
 - 每個 repository 自帶領域錯誤型別（`DuplicateUsernameError` / `DeviceNotFoundError` 等）
 - `tests/conftest.py`：共用 `db_conn` fixture（in-memory SQLite + schema 已套用）
 
-**測試與品質：** 68 unit tests passing、`ruff check` 全綠。
-
-### 🚧 進行中 / 未完成
-
-**Phase 3b：Service 層**（規劃中）
-- `services/user_service.py`：bcrypt 雜湊、註冊/登入
-- `services/device_service.py`：新增裝置（觸發 BLE 連線）
-- `services/channel_service.py`：頻道 CRUD、限頻寫入 reading、控制指令編碼
-- **BLE 自動重連邏輯**（指數退避）放在 service 層，方便用 `MockBLEManager` 測試
+**Phase 3b：Service 層**
+- `services/user_service.py`：bcrypt 雜湊（cost 可注入，測試用低 cost）、`register` / `authenticate`；密碼長度限制 8–72 bytes（後者避免 bcrypt 截斷）
+- `services/device_service.py`：`DeviceService`（建構注入 `BLEManager`）；`scan` / `add_device`（驗證 MAC → 寫 DB → best-effort 連線，連不上仍保留裝置）/ `remove_device`（先斷線再刪除）/ `list_devices`
+- `services/channel_service.py`：`ChannelService`（注入 `BLEManager` / `RateLimiter` / `on_reading` callback）；`add_channel` / `write_command`（僅 controller 型，編碼後 BLE write）/ `handle_notify`（解析 → 即時推播 callback 不限頻 → DB 寫入限頻）/ `get_history` / `list_by_device`
+- 設計邊界：service 層維持純業務邏輯，BLE 操作同步呼叫介面（序列化由 `BluepyManager` 內部處理）；notify subscribe 的執行緒 wiring 與自動重連背景迴圈留待 3e
 
 **Phase 3c：認證 Blueprint**
-- Flask-Login + bcrypt + Flask-WTF CSRF
-- `/auth/register`、`/auth/login`、`/auth/logout`
+- `web/__init__.py`：application factory `create_app`，整合 Flask-Login + Flask-WTF CSRF
+- `web/db.py`：per-request SQLite 連線（`flask.g` + `teardown_appcontext`，每執行緒專屬）
+- `web/auth.py`：`/auth/register`、`/auth/login`、`/auth/logout`；`LoginUser`、`FlaskForm`（自帶 CSRF token）、`next` 參數的 open-redirect 防護
+- `web/templates/`：`base` / `index` / `auth/login` / `auth/register` 陽春模板（含 CSRF）
+- 已可從瀏覽器完成「註冊 → 自動登入 → 登出」全流程
+
+**測試與品質：** 102 unit tests passing、`ruff check` 與 `mypy src`（strict）全綠。
+
+### 🚧 進行中 / 未完成
 
 **Phase 3d：Device / Channel CRUD Blueprint**
 - `/devices`（列表、掃描、新增、刪除）
