@@ -7,6 +7,7 @@ UI push (on_reading) is unthrottled; DB persistence is rate-limited per channel.
 
 from __future__ import annotations
 
+import logging
 import sqlite3
 from collections.abc import Callable
 from datetime import UTC, datetime
@@ -17,6 +18,8 @@ from home_server.ble.rate_limiter import RateLimiter
 from home_server.db import channels, devices, readings
 from home_server.db.channels import Channel, ChannelNotFoundError, ChannelType
 from home_server.db.readings import Reading
+
+log = logging.getLogger(__name__)
 
 # (channel_id, value, iso_utc_timestamp) pushed to the UI on every notify.
 ReadingCallback = Callable[[int, float, str], None]
@@ -93,7 +96,14 @@ class ChannelService:
         value = parser.decode(raw_bytes, channel.data_format)
         # ISO 8601 UTC for the UI callback, e.g. "2026-05-27T10:00:00+00:00".
         timestamp = datetime.now(UTC).isoformat(timespec="seconds")
-        self._on_reading(channel_id, value, timestamp)  # UI push, unthrottled
+        # UI push is best-effort: a failing callback (e.g. a dead SocketIO
+        # client in phase 3e) must never drop the rate-limited DB write below.
+        try:
+            self._on_reading(channel_id, value, timestamp)  # unthrottled
+        except Exception:
+            log.warning(
+                "on_reading callback raised for channel %d", channel_id, exc_info=True
+            )
         if self._limiter.should_emit(str(channel_id)):
             readings.insert(conn, channel_id=channel_id, value=value)
         return value

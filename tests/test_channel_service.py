@@ -124,6 +124,24 @@ def test_handle_notify_rate_limits_persistence_but_always_emits(db_conn, device_
     assert len(received) == 2  # both pushed to UI
 
 
+def test_handle_notify_persists_even_if_callback_raises(db_conn, device_id) -> None:
+    def boom(cid: int, value: float, ts: str) -> None:
+        raise RuntimeError("UI client gone")
+
+    svc, _ = _make_service(on_reading=boom)
+    channel = svc.add_channel(
+        db_conn,
+        device_id=device_id,
+        name="temp",
+        type="display",
+        char_uuid=DISP_UUID,
+        data_format="uint8",
+    )
+    value = svc.handle_notify(db_conn, channel_id=channel.id, raw_bytes=b"\x07")
+    assert value == 7.0
+    assert readings.count_by_channel(db_conn, channel.id) == 1
+
+
 def test_get_history_returns_readings(db_conn, device_id) -> None:
     svc, _ = _make_service()
     channel = svc.add_channel(
