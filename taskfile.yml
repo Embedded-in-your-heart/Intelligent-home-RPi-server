@@ -1,0 +1,68 @@
+version: '3'
+
+dotenv: ['.env']
+
+tasks:
+  default:
+    desc: List available tasks
+    cmds:
+      - task --list
+    silent: true
+
+  install:
+    desc: Sync uv dependencies
+    cmds:
+      - uv sync
+
+  run:
+    desc: Start the dev server (loads .env)
+    cmds:
+      - uv run python -m home_server
+
+  test:
+    desc: Run pytest
+    cmds:
+      - uv run pytest
+
+  test:verbose:
+    desc: Run pytest with -v
+    cmds:
+      - uv run pytest -v
+
+  lint:
+    desc: Ruff check
+    cmds:
+      - uv run ruff check src tests
+
+  lint:fix:
+    desc: Ruff check with autofix
+    cmds:
+      - uv run ruff check --fix src tests
+
+  fmt:
+    desc: Ruff format
+    cmds:
+      - uv run ruff format src tests
+
+  typecheck:
+    desc: mypy strict on src/
+    cmds:
+      - uv run mypy src
+
+  ci:
+    desc: Lint + typecheck + tests (what CI would run)
+    cmds:
+      - task: lint
+      - task: typecheck
+      - task: test
+
+  scan:
+    desc: "RPi only: BLE scan and print discovered devices (arg: duration_s, default 5)"
+    cmds:
+      - uv run python scripts/scan_ble.py {{.CLI_ARGS}}
+
+  clean:
+    desc: Remove caches and the dev SQLite file
+    cmds:
+      - rm -rf .pytest_cache .ruff_cache .mypy_cache
+      - rm -f data/home.db data/home.db-journal data/home.db-wal data/home.db-shm

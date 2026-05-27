@@ -6,6 +6,18 @@
 
 ## 快速啟動
 
+### 環境變數
+
+複製 `.env.example` 成 `.env` 並調整（`.env` 已被 gitignore）：
+
+```powershell
+cp .env.example .env
+# 編輯 .env，填入 HOME_SERVER_SECRET_KEY（或設 HOME_SERVER_DEBUG=1 略過）
+```
+
+`taskfile.yml` 會自動載入 `.env`；若直接用 `uv run` 則需手動 export
+（Linux：`set -a; source .env; set +a`）。
+
 ### Windows（開發、非 BLE 測試）
 
 ```powershell
@@ -29,6 +41,26 @@ BLE 掃描小工具（驗證 STM32 廣播）：
 
 ```bash
 uv run python scripts/scan_ble.py 5
+```
+
+### Taskfile（推薦）
+
+安裝 [Task](https://taskfile.dev/installation/) 之後可用 `task <name>` 跑常用指令，
+會自動載入 `.env`：
+
+```bash
+task                 # 列出所有 task
+task install         # uv sync
+task run             # 啟動 dev server
+task test            # pytest
+task test:verbose    # pytest -v
+task lint            # ruff check
+task lint:fix        # ruff check --fix
+task fmt             # ruff format
+task typecheck       # mypy strict
+task ci              # lint + typecheck + test
+task scan -- 5       # RPi 限定：BLE 掃描 5 秒
+task clean           # 清除 caches 與 dev SQLite
 ```
 
 ## 專案狀態
