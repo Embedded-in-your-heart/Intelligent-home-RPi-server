@@ -19,7 +19,8 @@ def get_conn() -> sqlite3.Connection:
     """Return the per-request connection, opening one on first use."""
     if "conn" not in g:
         g.conn = connection.connect(current_app.config["DB_PATH"])
-    return g.conn  # type: ignore[no-any-return]
+    conn: sqlite3.Connection = g.conn
+    return conn
 
 
 def create_app(config: Config) -> Flask:
@@ -34,7 +35,7 @@ def create_app(config: Config) -> Flask:
     from home_server.web.auth import LoginUser
     from home_server.web.auth import bp as auth_bp
 
-    @login_manager.user_loader  # type: ignore[untyped-decorator]
+    @login_manager.user_loader
     def load_user(user_id: str) -> LoginUser | None:
         user = users.get_by_id(get_conn(), int(user_id))
         return LoginUser(user) if user is not None else None
@@ -42,7 +43,7 @@ def create_app(config: Config) -> Flask:
     app.register_blueprint(auth_bp)
 
     @app.get("/")
-    @login_required  # type: ignore[untyped-decorator]
+    @login_required
     def index() -> str:
         return render_template("index.html")
 

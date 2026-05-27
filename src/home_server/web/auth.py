@@ -23,7 +23,7 @@ from home_server.services import user_service
 bp = Blueprint("auth", __name__, url_prefix="/auth")
 
 
-class LoginUser(UserMixin):  # type: ignore[misc]
+class LoginUser(UserMixin):
     def __init__(self, user: User) -> None:
         self.user = user
 
@@ -35,12 +35,12 @@ class LoginUser(UserMixin):  # type: ignore[misc]
         return self.user.username
 
 
-class LoginForm(FlaskForm):  # type: ignore[misc]
+class LoginForm(FlaskForm):
     username = StringField("Username", validators=[DataRequired()])
     password = PasswordField("Password", validators=[DataRequired()])
 
 
-class RegisterForm(FlaskForm):  # type: ignore[misc]
+class RegisterForm(FlaskForm):
     username = StringField("Username", validators=[DataRequired()])
     password = PasswordField("Password", validators=[DataRequired(), Length(min=8)])
     confirm = PasswordField(
@@ -96,7 +96,7 @@ def login() -> Response | str:
 
 
 @bp.route("/logout", methods=["POST"])
-@login_required  # type: ignore[untyped-decorator]
+@login_required
 def logout() -> Response:
     logout_user()
     return redirect(url_for("auth.login"))
