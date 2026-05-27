@@ -102,7 +102,7 @@ task clean           # 清除 caches 與 dev SQLite
 - `web/templates/`：`base` / `index` / `auth/login` / `auth/register` 陽春模板（含 CSRF）
 - 已可從瀏覽器完成「註冊 → 自動登入 → 登出」全流程
 
-**測試與品質：** 102 unit tests passing、`ruff check` 與 `mypy src`（strict）全綠。
+**測試與品質：** 103 unit tests passing、`ruff check` 與 `mypy src`（strict）全綠。
 
 ### 🚧 進行中 / 未完成
 
