@@ -151,3 +151,30 @@ def test_list_by_device(db_conn, device_id) -> None:
         data_format="uint8",
     )
     assert len(svc.list_by_device(db_conn, device_id)) == 1
+
+
+def test_rate_limiter_is_per_channel(db_conn, device_id) -> None:
+    # Notifies on two different channels within the same interval must both
+    # persist — a global (non-per-channel) key would drop the second.
+    now = [0.0]
+    svc, _ = _make_service(min_interval=10.0, clock=lambda: now[0])
+    ch1 = svc.add_channel(
+        db_conn,
+        device_id=device_id,
+        name="a",
+        type="display",
+        char_uuid=DISP_UUID,
+        data_format="uint8",
+    )
+    ch2 = svc.add_channel(
+        db_conn,
+        device_id=device_id,
+        name="b",
+        type="display",
+        char_uuid=CTRL_UUID,
+        data_format="uint8",
+    )
+    svc.handle_notify(db_conn, channel_id=ch1.id, raw_bytes=b"\x01")
+    svc.handle_notify(db_conn, channel_id=ch2.id, raw_bytes=b"\x02")
+    assert readings.count_by_channel(db_conn, ch1.id) == 1
+    assert readings.count_by_channel(db_conn, ch2.id) == 1

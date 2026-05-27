@@ -21,8 +21,6 @@ from home_server.db.readings import Reading
 # (channel_id, value, iso_utc_timestamp) pushed to the UI on every notify.
 ReadingCallback = Callable[[int, float, str], None]
 
-_TS_FMT = "%Y-%m-%d %H:%M:%S"
-
 
 class WrongChannelTypeError(ValueError):
     pass
@@ -93,7 +91,8 @@ class ChannelService:
         if channel is None:
             raise ChannelNotFoundError(f"channel not found: id={channel_id}")
         value = parser.decode(raw_bytes, channel.data_format)
-        timestamp = datetime.now(UTC).strftime(_TS_FMT)
+        # ISO 8601 UTC for the UI callback, e.g. "2026-05-27T10:00:00+00:00".
+        timestamp = datetime.now(UTC).isoformat(timespec="seconds")
         self._on_reading(channel_id, value, timestamp)  # UI push, unthrottled
         if self._limiter.should_emit(str(channel_id)):
             readings.insert(conn, channel_id=channel_id, value=value)
