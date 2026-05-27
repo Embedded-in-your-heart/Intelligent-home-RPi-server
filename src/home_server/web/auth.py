@@ -19,6 +19,7 @@ from wtforms.validators import DataRequired, EqualTo, Length
 from home_server.db import users
 from home_server.db.users import DuplicateUsernameError, User
 from home_server.services import user_service
+from home_server.web.db import get_conn
 
 bp = Blueprint("auth", __name__, url_prefix="/auth")
 
@@ -57,8 +58,6 @@ def _safe_next(target: str | None) -> str:
 
 @bp.route("/register", methods=["GET", "POST"])
 def register() -> Response | str:
-    from home_server.web import get_conn
-
     form = RegisterForm()
     if form.validate_on_submit():
         try:
@@ -80,8 +79,6 @@ def register() -> Response | str:
 
 @bp.route("/login", methods=["GET", "POST"])
 def login() -> Response | str:
-    from home_server.web import get_conn
-
     form = LoginForm()
     if form.validate_on_submit():
         user = user_service.authenticate(

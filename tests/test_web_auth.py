@@ -115,3 +115,40 @@ def test_login_wrong_password_shows_error(client) -> None:
     )
     assert resp.status_code == 200
     assert b"Invalid username or password" in resp.data
+
+
+def _register_then_logout(client: FlaskClient, username: str) -> None:
+    token = _csrf_token(client, "/auth/register")
+    client.post(
+        "/auth/register",
+        data={
+            "username": username,
+            "password": "password1",
+            "confirm": "password1",
+            "csrf_token": token,
+        },
+        follow_redirects=True,
+    )
+    client.post("/auth/logout", data={"csrf_token": _csrf_token(client, "/")})
+
+
+def test_login_honors_relative_next(client) -> None:
+    _register_then_logout(client, "dave")
+    token = _csrf_token(client, "/auth/login")
+    resp = client.post(
+        "/auth/login?next=/health",
+        data={"username": "dave", "password": "password1", "csrf_token": token},
+    )
+    assert resp.status_code == 302
+    assert resp.headers["Location"] == "/health"
+
+
+def test_login_blocks_open_redirect(client) -> None:
+    _register_then_logout(client, "eve")
+    token = _csrf_token(client, "/auth/login")
+    resp = client.post(
+        "/auth/login?next=//evil.com",
+        data={"username": "eve", "password": "password1", "csrf_token": token},
+    )
+    assert resp.status_code == 302
+    assert resp.headers["Location"] == "/"  # fell back to index

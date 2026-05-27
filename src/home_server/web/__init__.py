@@ -1,26 +1,14 @@
-"""Flask application factory and per-request DB connection helper."""
+"""Flask application factory."""
 
 from __future__ import annotations
 
-import sqlite3
-
-from flask import Flask, current_app, g, render_template
+from flask import Flask, g, render_template
 from flask_login import LoginManager, login_required
 from flask_wtf import CSRFProtect
 
 from home_server.config import Config
-from home_server.db import connection, users
-
-login_manager = LoginManager()
-csrf = CSRFProtect()
-
-
-def get_conn() -> sqlite3.Connection:
-    """Return the per-request connection, opening one on first use."""
-    if "conn" not in g:
-        g.conn = connection.connect(current_app.config["DB_PATH"])
-    conn: sqlite3.Connection = g.conn
-    return conn
+from home_server.db import users
+from home_server.web.db import get_conn
 
 
 def create_app(config: Config) -> Flask:
@@ -28,9 +16,10 @@ def create_app(config: Config) -> Flask:
     app.config["SECRET_KEY"] = config.secret_key
     app.config["DB_PATH"] = config.db_path
 
+    login_manager = LoginManager()
     login_manager.init_app(app)
     login_manager.login_view = "auth.login"
-    csrf.init_app(app)
+    CSRFProtect(app)
 
     from home_server.web.auth import LoginUser
     from home_server.web.auth import bp as auth_bp
