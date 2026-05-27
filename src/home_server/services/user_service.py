@@ -15,6 +15,9 @@ class WeakPasswordError(ValueError):
 
 
 _MIN_PASSWORD_LEN = 8
+# bcrypt silently truncates input beyond 72 bytes, so reject longer passwords
+# to avoid two distinct passwords hashing to the same value.
+_MAX_PASSWORD_BYTES = 72
 
 
 def hash_password(password: str, *, cost: int = 12) -> str:
@@ -32,6 +35,10 @@ def register(
     if len(password) < _MIN_PASSWORD_LEN:
         raise WeakPasswordError(
             f"password must be at least {_MIN_PASSWORD_LEN} characters"
+        )
+    if len(password.encode("utf-8")) > _MAX_PASSWORD_BYTES:
+        raise WeakPasswordError(
+            f"password must be at most {_MAX_PASSWORD_BYTES} bytes"
         )
     password_hash = hash_password(password, cost=cost)
     return users.create(conn, username=username, password_hash=password_hash)

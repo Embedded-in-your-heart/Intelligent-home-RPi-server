@@ -19,6 +19,11 @@ def test_register_rejects_weak_password(db_conn) -> None:
         user_service.register(db_conn, username="bob", password="short", cost=4)
 
 
+def test_register_rejects_password_over_72_bytes(db_conn) -> None:
+    with pytest.raises(WeakPasswordError):
+        user_service.register(db_conn, username="bob", password="a" * 73, cost=4)
+
+
 def test_register_rejects_duplicate_username(db_conn) -> None:
     user_service.register(db_conn, username="alice", password="password1", cost=4)
     with pytest.raises(DuplicateUsernameError):
