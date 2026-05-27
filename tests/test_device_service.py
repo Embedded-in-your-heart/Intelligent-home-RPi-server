@@ -71,3 +71,14 @@ def test_list_devices(db_conn, owner) -> None:
     svc = DeviceService(MockBLEManager())
     svc.add_device(db_conn, owner_user_id=owner, address=ADDR, name="x")
     assert len(svc.list_devices(db_conn)) == 1
+
+
+def test_remove_device_not_connected_just_deletes(db_conn, owner) -> None:
+    # Device that never connected (connect failed) must still delete cleanly,
+    # without attempting a disconnect on an unconnected handle.
+    mock = MockBLEManager(fail_connect_for={ADDR})
+    svc = DeviceService(mock)
+    device = svc.add_device(db_conn, owner_user_id=owner, address=ADDR, name="x")
+    assert not mock.is_connected(ADDR)
+    svc.remove_device(db_conn, device.id)
+    assert devices.get_by_id(db_conn, device.id) is None
