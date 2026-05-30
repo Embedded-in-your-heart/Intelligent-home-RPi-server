@@ -73,3 +73,18 @@ def test_add_channel_duplicate_name_flashes(
     )
     assert resp.status_code == 200
     assert b"Channel name already exists" in resp.data
+
+
+def test_add_channel_device_not_found(logged_in_client: FlaskClient) -> None:
+    token = _csrf_token(logged_in_client, "/devices")
+    resp = logged_in_client.post(
+        "/devices/999/channels",
+        data={
+            "name": "X",
+            "type": "display",
+            "char_uuid": "u",
+            "data_format": "uint8",
+            "csrf_token": token,
+        },
+    )
+    assert resp.status_code == 404

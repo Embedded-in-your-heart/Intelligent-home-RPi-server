@@ -24,12 +24,10 @@ class AddChannelForm(FlaskForm):
         "Type", choices=[("controller", "controller"), ("display", "display")]
     )
     char_uuid = StringField("Characteristic UUID", validators=[DataRequired()])
-    data_format = SelectField("Data format")
+    data_format = SelectField(
+        "Data format", choices=[(f, f) for f in parser.supported_formats()]
+    )
     unit = StringField("Unit")
-
-    def __init__(self) -> None:
-        super().__init__()
-        self.data_format.choices = [(f, f) for f in parser.supported_formats()]
 
 
 @bp.post("/devices/<int:device_id>/channels")
