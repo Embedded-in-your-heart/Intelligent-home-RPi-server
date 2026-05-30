@@ -122,5 +122,9 @@ def test_delete_missing_channel_404(logged_in_client: FlaskClient) -> None:
 
 
 def test_delete_channel_requires_login(client: FlaskClient) -> None:
-    resp = client.post("/channels/1/delete")
-    assert resp.status_code == 400
+    # Supply a valid CSRF token (from an anonymous page) so the CSRF guard
+    # passes and @login_required is what rejects the unauthenticated request.
+    token = _csrf_token(client, "/auth/login")
+    resp = client.post("/channels/1/delete", data={"csrf_token": token})
+    assert resp.status_code == 302
+    assert "/auth/login" in resp.headers["Location"]
