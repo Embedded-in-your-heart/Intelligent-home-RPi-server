@@ -17,11 +17,19 @@ CHANNEL_SERVICE_KEY = "home_channel_service"
 
 def get_device_service() -> DeviceService:
     svc = current_app.extensions[DEVICE_SERVICE_KEY]
-    assert isinstance(svc, DeviceService)
+    if not isinstance(svc, DeviceService):
+        raise TypeError(
+            f"Expected DeviceService in extensions[{DEVICE_SERVICE_KEY!r}], "
+            f"got {type(svc).__name__}"
+        )
     return svc
 
 
 def get_channel_service() -> ChannelService:
     svc = current_app.extensions[CHANNEL_SERVICE_KEY]
-    assert isinstance(svc, ChannelService)
+    if not isinstance(svc, ChannelService):
+        raise TypeError(
+            f"Expected ChannelService in extensions[{CHANNEL_SERVICE_KEY!r}], "
+            f"got {type(svc).__name__}"
+        )
     return svc
