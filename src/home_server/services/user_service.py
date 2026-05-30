@@ -44,6 +44,26 @@ def register(
     return users.create(conn, username=username, password_hash=password_hash)
 
 
+def seed_admin(
+    conn: sqlite3.Connection,
+    *,
+    username: str,
+    password: str,
+    cost: int = 12,
+) -> bool:
+    """Create the admin account from configured credentials if it is absent.
+
+    Intended to run once at startup so there is always a login. Returns True
+    if a new account was created, False if the username already existed (in
+    which case the stored password is left untouched). Raises WeakPasswordError
+    if the configured password fails the same rules as normal registration.
+    """
+    if users.get_by_username(conn, username) is not None:
+        return False
+    register(conn, username=username, password=password, cost=cost)
+    return True
+
+
 def authenticate(
     conn: sqlite3.Connection,
     *,

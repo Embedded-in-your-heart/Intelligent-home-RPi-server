@@ -31,6 +31,8 @@ class Config:
     log_level: str
     ble_scan_duration: float
     reading_min_interval: float
+    admin_username: str
+    admin_password: str | None
     debug: bool
 
     @classmethod
@@ -52,5 +54,8 @@ class Config:
             log_level=_env_str("HOME_SERVER_LOG_LEVEL", "INFO"),
             ble_scan_duration=_env_float("HOME_SERVER_BLE_SCAN_DURATION", 5.0),
             reading_min_interval=_env_float("HOME_SERVER_READING_MIN_INTERVAL", 1.0),
+            admin_username=_env_str("HOME_SERVER_ADMIN_USERNAME", "admin"),
+            # Empty/unset means "do not seed an admin account".
+            admin_password=os.environ.get("HOME_SERVER_ADMIN_PASSWORD") or None,
             debug=debug,
         )

@@ -44,6 +44,8 @@ def app(tmp_path: Path) -> Flask:
         log_level="INFO",
         ble_scan_duration=1.0,
         reading_min_interval=1.0,
+        admin_username="admin",
+        admin_password=None,
         debug=True,
     )
     flask_app = create_app(config)

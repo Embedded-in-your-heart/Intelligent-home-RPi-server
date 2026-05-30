@@ -1,13 +1,41 @@
 {% extends "base.html" %}
 {% block title %}Register{% endblock %}
 {% block content %}
-<h1>Register</h1>
-<form method="post">
-  {{ form.csrf_token }}
-  <p>{{ form.username.label }} {{ form.username() }}</p>
-  <p>{{ form.password.label }} {{ form.password() }}</p>
-  <p>{{ form.confirm.label }} {{ form.confirm() }}</p>
-  <button type="submit">Register</button>
-</form>
-<a href="{{ url_for('auth.login') }}">Login</a>
+<div class="row justify-content-center">
+  <div class="col-sm-8 col-md-6 col-lg-4">
+    <div class="card shadow-sm">
+      <div class="card-body">
+        <h1 class="card-title h4 mb-3 text-center">Register</h1>
+        <form method="post">
+          {{ form.csrf_token }}
+          <div class="mb-3">
+            {{ form.username.label(class="form-label") }}
+            {{ form.username(class="form-control" + (" is-invalid" if form.username.errors else "")) }}
+            {% for error in form.username.errors %}
+              <div class="invalid-feedback">{{ error }}</div>
+            {% endfor %}
+          </div>
+          <div class="mb-3">
+            {{ form.password.label(class="form-label") }}
+            {{ form.password(class="form-control" + (" is-invalid" if form.password.errors else "")) }}
+            {% for error in form.password.errors %}
+              <div class="invalid-feedback">{{ error }}</div>
+            {% endfor %}
+          </div>
+          <div class="mb-3">
+            {{ form.confirm.label(class="form-label") }}
+            {{ form.confirm(class="form-control" + (" is-invalid" if form.confirm.errors else "")) }}
+            {% for error in form.confirm.errors %}
+              <div class="invalid-feedback">{{ error }}</div>
+            {% endfor %}
+          </div>
+          <button type="submit" class="btn btn-primary w-100">Register</button>
+        </form>
+        <p class="text-center mt-3 mb-0">
+          <a href="{{ url_for('auth.login') }}">Login</a>
+        </p>
+      </div>
+    </div>
+  </div>
+</div>
 {% endblock %}

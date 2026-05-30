@@ -1,9 +1,10 @@
 {% extends "base.html" %}
 {% block title %}Dashboard{% endblock %}
 {% block content %}
-<p>Logged in as {{ current_user.username }}</p>
-<form method="post" action="{{ url_for('auth.logout') }}">
-  <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-  <button type="submit">Logout</button>
-</form>
+<div class="card shadow-sm">
+  <div class="card-body">
+    <h1 class="card-title h4">Dashboard</h1>
+    <p class="card-text mb-0">Logged in as {{ current_user.username }}</p>
+  </div>
+</div>
 {% endblock %}
