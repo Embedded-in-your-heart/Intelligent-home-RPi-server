@@ -35,4 +35,40 @@
     {% endif %}
   </div>
 </div>
+
+<div class="card shadow-sm">
+  <div class="card-body">
+    <h2 class="card-title h5 mb-3">Add channel</h2>
+    <form method="post"
+          action="{{ url_for('channels.add_channel', device_id=device.id) }}"
+          class="row g-2">
+      <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+      <div class="col-sm-3">
+        <input class="form-control" name="name" placeholder="Temperature" required>
+      </div>
+      <div class="col-sm-2">
+        <select class="form-select" name="type">
+          <option value="display">display</option>
+          <option value="controller">controller</option>
+        </select>
+      </div>
+      <div class="col-sm-3">
+        <input class="form-control" name="char_uuid" placeholder="Characteristic UUID" required>
+      </div>
+      <div class="col-sm-2">
+        <select class="form-select" name="data_format">
+          {% for fmt in formats %}
+          <option value="{{ fmt }}">{{ fmt }}</option>
+          {% endfor %}
+        </select>
+      </div>
+      <div class="col-sm-1">
+        <input class="form-control" name="unit" placeholder="Unit">
+      </div>
+      <div class="col-sm-1 d-grid">
+        <button class="btn btn-primary" type="submit">Add</button>
+      </div>
+    </form>
+  </div>
+</div>
 {% endblock %}

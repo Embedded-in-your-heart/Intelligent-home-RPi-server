@@ -9,6 +9,7 @@ from werkzeug.wrappers import Response
 from wtforms import StringField
 from wtforms.validators import DataRequired
 
+from home_server.ble import parser
 from home_server.db import devices
 from home_server.db.devices import DeviceNotFoundError, DuplicateAddressError
 from home_server.services.device_service import InvalidAddressError
@@ -53,7 +54,12 @@ def detail(device_id: int) -> str:
     if device is None:
         abort(404)
     device_channels = get_channel_service().list_by_device(conn, device_id)
-    return render_template("devices/detail.html", device=device, channels=device_channels)
+    return render_template(
+        "devices/detail.html",
+        device=device,
+        channels=device_channels,
+        formats=parser.supported_formats(),
+    )
 
 
 @bp.post("/devices/<int:device_id>/delete")
