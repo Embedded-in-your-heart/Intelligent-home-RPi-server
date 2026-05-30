@@ -16,7 +16,7 @@
     {% if channels %}
     <table class="table table-sm align-middle">
       <thead>
-        <tr><th>Name</th><th>Type</th><th>UUID</th><th>Format</th><th>Unit</th></tr>
+        <tr><th>Name</th><th>Type</th><th>UUID</th><th>Format</th><th>Unit</th><th></th></tr>
       </thead>
       <tbody>
         {% for channel in channels %}
@@ -26,6 +26,14 @@
           <td><code>{{ channel.char_uuid }}</code></td>
           <td>{{ channel.data_format }}</td>
           <td>{{ channel.unit or "" }}</td>
+          <td class="text-end">
+            <form method="post"
+                  action="{{ url_for('channels.delete_channel', channel_id=channel.id) }}"
+                  onsubmit="return confirm('Delete this channel?');">
+              <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+              <button class="btn btn-outline-danger btn-sm" type="submit">Delete</button>
+            </form>
+          </td>
         </tr>
         {% endfor %}
       </tbody>

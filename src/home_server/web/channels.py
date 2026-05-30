@@ -60,3 +60,14 @@ def add_channel(device_id: int) -> Response | str:
         channels=device_channels,
         formats=parser.supported_formats(),
     )
+
+
+@bp.post("/channels/<int:channel_id>/delete")
+@login_required
+def delete_channel(channel_id: int) -> Response:
+    conn = get_conn()
+    channel = channels.get_by_id(conn, channel_id)
+    if channel is None:
+        abort(404)
+    channels.delete(conn, channel_id)
+    return redirect(url_for("devices.detail", device_id=channel.device_id))

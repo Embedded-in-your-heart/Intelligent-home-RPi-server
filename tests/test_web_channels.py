@@ -88,3 +88,34 @@ def test_add_channel_device_not_found(logged_in_client: FlaskClient) -> None:
         },
     )
     assert resp.status_code == 404
+
+
+def test_delete_channel_removes_it(app: Flask, logged_in_client: FlaskClient) -> None:
+    device_id = _make_device(app, "AA:BB:CC:DD:EE:08", "B3")
+    conn = connection.connect(app.config["DB_PATH"])
+    try:
+        channel_id = channels.create(
+            conn,
+            device_id=device_id,
+            name="Gone",
+            type="display",
+            char_uuid="u",
+            data_format="uint8",
+            unit=None,
+        )
+    finally:
+        conn.close()
+    token = _csrf_token(logged_in_client, f"/devices/{device_id}")
+    resp = logged_in_client.post(
+        f"/channels/{channel_id}/delete",
+        data={"csrf_token": token},
+        follow_redirects=True,
+    )
+    assert resp.status_code == 200
+    assert b"Gone" not in resp.data
+
+
+def test_delete_missing_channel_404(logged_in_client: FlaskClient) -> None:
+    token = _csrf_token(logged_in_client, "/devices")
+    resp = logged_in_client.post("/channels/999/delete", data={"csrf_token": token})
+    assert resp.status_code == 404
