@@ -65,3 +65,48 @@ def test_detail_shows_device_and_channels(
 def test_detail_404_for_missing(logged_in_client: FlaskClient) -> None:
     resp = logged_in_client.get("/devices/999")
     assert resp.status_code == 404
+
+
+def test_add_device_persists_with_owner(
+    app: Flask, logged_in_client: FlaskClient
+) -> None:
+    token = _csrf_token(logged_in_client, "/devices")
+    logged_in_client.post(
+        "/devices",
+        data={"address": "AA:BB:CC:DD:EE:FF", "name": "Sensor", "csrf_token": token},
+        follow_redirects=True,
+    )
+    conn = connection.connect(app.config["DB_PATH"])
+    try:
+        device = devices.get_by_address(conn, "AA:BB:CC:DD:EE:FF")
+    finally:
+        conn.close()
+    assert device is not None
+    assert device.name == "Sensor"
+    assert device.owner_user_id == 1
+
+
+def test_add_device_invalid_address_flashes(logged_in_client: FlaskClient) -> None:
+    token = _csrf_token(logged_in_client, "/devices")
+    resp = logged_in_client.post(
+        "/devices",
+        data={"address": "not-a-mac", "name": "X", "csrf_token": token},
+    )
+    assert resp.status_code == 200
+    assert b"Invalid BLE address" in resp.data
+
+
+def test_add_device_duplicate_flashes(logged_in_client: FlaskClient) -> None:
+    token = _csrf_token(logged_in_client, "/devices")
+    logged_in_client.post(
+        "/devices",
+        data={"address": "AA:BB:CC:DD:EE:01", "name": "A", "csrf_token": token},
+        follow_redirects=True,
+    )
+    token = _csrf_token(logged_in_client, "/devices")
+    resp = logged_in_client.post(
+        "/devices",
+        data={"address": "AA:BB:CC:DD:EE:01", "name": "B", "csrf_token": token},
+    )
+    assert resp.status_code == 200
+    assert b"Address already exists" in resp.data

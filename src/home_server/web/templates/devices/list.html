@@ -24,4 +24,24 @@
     {% endif %}
   </div>
 </div>
+
+<div class="card shadow-sm">
+  <div class="card-body">
+    <h2 class="card-title h5 mb-3">Add device</h2>
+    <form method="post" action="{{ url_for('devices.list_devices') }}" class="row g-2">
+      <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+      <div class="col-sm-5">
+        <input class="form-control" name="address" placeholder="AA:BB:CC:DD:EE:FF"
+               value="{{ form.address.data or '' }}" required>
+      </div>
+      <div class="col-sm-5">
+        <input class="form-control" name="name" placeholder="Living room sensor"
+               value="{{ form.name.data or '' }}" required>
+      </div>
+      <div class="col-sm-2 d-grid">
+        <button class="btn btn-primary" type="submit">Add</button>
+      </div>
+    </form>
+  </div>
+</div>
 {% endblock %}
