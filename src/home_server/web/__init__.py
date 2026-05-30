@@ -47,6 +47,10 @@ def create_app(config: Config, ble: BLEManager | None = None) -> Flask:
 
     app.register_blueprint(auth_bp)
 
+    from home_server.web.devices import bp as devices_bp
+
+    app.register_blueprint(devices_bp)
+
     @app.get("/")
     @login_required
     def index() -> str:

@@ -11,6 +11,11 @@
     <div class="container">
       <a class="navbar-brand" href="{{ url_for('index') }}">Home Server</a>
       {% if current_user.is_authenticated %}
+      <ul class="navbar-nav me-auto">
+        <li class="nav-item">
+          <a class="nav-link" href="{{ url_for('devices.list_devices') }}">Devices</a>
+        </li>
+      </ul>
       <form method="post" action="{{ url_for('auth.logout') }}" class="d-flex">
         <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
         <button class="btn btn-outline-light btn-sm" type="submit">Logout</button>

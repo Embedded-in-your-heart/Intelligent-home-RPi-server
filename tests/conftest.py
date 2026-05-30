@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import re
 import sqlite3
 from collections.abc import Iterator
 from pathlib import Path
@@ -56,3 +57,27 @@ def app(tmp_path: Path) -> Flask:
 @pytest.fixture
 def client(app: Flask) -> FlaskClient:
     return app.test_client()
+
+
+def _csrf_token(client: FlaskClient, path: str) -> str:
+    html = client.get(path).get_data(as_text=True)
+    match = re.search(r'name="csrf_token"[^>]*value="([^"]+)"', html)
+    assert match, f"csrf_token not found at {path}"
+    return match.group(1)
+
+
+@pytest.fixture
+def logged_in_client(client: FlaskClient) -> FlaskClient:
+    """A client that has registered and logged in as 'tester' (user id 1)."""
+    token = _csrf_token(client, "/auth/register")
+    client.post(
+        "/auth/register",
+        data={
+            "username": "tester",
+            "password": "password1",
+            "confirm": "password1",
+            "csrf_token": token,
+        },
+        follow_redirects=True,
+    )
+    return client

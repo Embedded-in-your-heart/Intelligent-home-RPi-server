@@ -1,0 +1,27 @@
+{% extends "base.html" %}
+{% block title %}Devices{% endblock %}
+{% block content %}
+<div class="card shadow-sm mb-4">
+  <div class="card-body">
+    <h1 class="card-title h4 mb-3">Devices</h1>
+    {% if devices %}
+    <table class="table table-sm align-middle">
+      <thead>
+        <tr><th>Name</th><th>Address</th><th>Created</th></tr>
+      </thead>
+      <tbody>
+        {% for device in devices %}
+        <tr>
+          <td>{{ device.name }}</td>
+          <td><code>{{ device.address }}</code></td>
+          <td>{{ device.created_at }}</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+    {% else %}
+    <p class="text-muted mb-0">No devices yet.</p>
+    {% endif %}
+  </div>
+</div>
+{% endblock %}
