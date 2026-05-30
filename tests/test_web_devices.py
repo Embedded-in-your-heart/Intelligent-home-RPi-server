@@ -111,3 +111,56 @@ def test_add_device_duplicate_flashes(logged_in_client: FlaskClient) -> None:
     )
     assert resp.status_code == 200
     assert b"Address already exists" in resp.data
+
+
+def test_delete_device_removes_it(app: Flask, logged_in_client: FlaskClient) -> None:
+    conn = connection.connect(app.config["DB_PATH"])
+    try:
+        device_id = devices.create(
+            conn, address="AA:BB:CC:DD:EE:04", name="Heater", owner_user_id=1
+        )
+    finally:
+        conn.close()
+    token = _csrf_token(logged_in_client, "/devices")
+    resp = logged_in_client.post(
+        f"/devices/{device_id}/delete",
+        data={"csrf_token": token},
+        follow_redirects=True,
+    )
+    assert resp.status_code == 200
+    assert b"Heater" not in resp.data
+
+
+def test_delete_device_cascades_channels(
+    app: Flask, logged_in_client: FlaskClient
+) -> None:
+    conn = connection.connect(app.config["DB_PATH"])
+    try:
+        device_id = devices.create(
+            conn, address="AA:BB:CC:DD:EE:05", name="Hub", owner_user_id=1
+        )
+        channels.create(
+            conn,
+            device_id=device_id,
+            name="Temp",
+            type="display",
+            char_uuid="u",
+            data_format="float32_le",
+            unit="C",
+        )
+    finally:
+        conn.close()
+    token = _csrf_token(logged_in_client, "/devices")
+    logged_in_client.post(f"/devices/{device_id}/delete", data={"csrf_token": token})
+    conn = connection.connect(app.config["DB_PATH"])
+    try:
+        remaining = channels.list_by_device(conn, device_id)
+    finally:
+        conn.close()
+    assert remaining == []
+
+
+def test_delete_missing_device_404(logged_in_client: FlaskClient) -> None:
+    token = _csrf_token(logged_in_client, "/devices")
+    resp = logged_in_client.post("/devices/999/delete", data={"csrf_token": token})
+    assert resp.status_code == 404
