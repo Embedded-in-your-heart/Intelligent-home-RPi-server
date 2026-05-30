@@ -164,3 +164,11 @@ def test_delete_missing_device_404(logged_in_client: FlaskClient) -> None:
     token = _csrf_token(logged_in_client, "/devices")
     resp = logged_in_client.post("/devices/999/delete", data={"csrf_token": token})
     assert resp.status_code == 404
+
+
+def test_post_without_csrf_rejected(logged_in_client: FlaskClient) -> None:
+    resp = logged_in_client.post(
+        "/devices",
+        data={"address": "AA:BB:CC:DD:EE:09", "name": "NoCSRF"},
+    )
+    assert resp.status_code == 400
