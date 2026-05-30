@@ -12,7 +12,7 @@
       <tbody>
         {% for device in devices %}
         <tr>
-          <td>{{ device.name }}</td>
+          <td><a href="{{ url_for('devices.detail', device_id=device.id) }}">{{ device.name }}</a></td>
           <td><code>{{ device.address }}</code></td>
           <td>{{ device.created_at }}</td>
         </tr>

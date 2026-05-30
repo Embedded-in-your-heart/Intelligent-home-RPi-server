@@ -3,7 +3,7 @@ import re
 from flask import Flask
 from flask.testing import FlaskClient
 
-from home_server.db import connection, devices
+from home_server.db import channels, connection, devices
 
 
 def _csrf_token(client: FlaskClient, path: str) -> str:
@@ -35,3 +35,33 @@ def test_devices_list_shows_device(app: Flask, logged_in_client: FlaskClient) ->
     assert resp.status_code == 200
     assert b"Fan" in resp.data
     assert b"AA:BB:CC:DD:EE:03" in resp.data
+
+
+def test_detail_shows_device_and_channels(
+    app: Flask, logged_in_client: FlaskClient
+) -> None:
+    conn = connection.connect(app.config["DB_PATH"])
+    try:
+        device_id = devices.create(
+            conn, address="AA:BB:CC:DD:EE:02", name="Lamp", owner_user_id=1
+        )
+        channels.create(
+            conn,
+            device_id=device_id,
+            name="Power",
+            type="controller",
+            char_uuid="uuid-1",
+            data_format="uint8",
+            unit=None,
+        )
+    finally:
+        conn.close()
+    resp = logged_in_client.get(f"/devices/{device_id}")
+    assert resp.status_code == 200
+    assert b"Lamp" in resp.data
+    assert b"Power" in resp.data
+
+
+def test_detail_404_for_missing(logged_in_client: FlaskClient) -> None:
+    resp = logged_in_client.get("/devices/999")
+    assert resp.status_code == 404

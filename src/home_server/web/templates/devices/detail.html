@@ -1,0 +1,38 @@
+{% extends "base.html" %}
+{% block title %}{{ device.name }}{% endblock %}
+{% block content %}
+<p><a href="{{ url_for('devices.list_devices') }}">&larr; Devices</a></p>
+
+<div class="card shadow-sm mb-4">
+  <div class="card-body">
+    <h1 class="card-title h4">{{ device.name }}</h1>
+    <p class="card-text mb-0"><code>{{ device.address }}</code></p>
+  </div>
+</div>
+
+<div class="card shadow-sm mb-4">
+  <div class="card-body">
+    <h2 class="card-title h5 mb-3">Channels</h2>
+    {% if channels %}
+    <table class="table table-sm align-middle">
+      <thead>
+        <tr><th>Name</th><th>Type</th><th>UUID</th><th>Format</th><th>Unit</th></tr>
+      </thead>
+      <tbody>
+        {% for channel in channels %}
+        <tr>
+          <td>{{ channel.name }}</td>
+          <td>{{ channel.type }}</td>
+          <td><code>{{ channel.char_uuid }}</code></td>
+          <td>{{ channel.data_format }}</td>
+          <td>{{ channel.unit or "" }}</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+    {% else %}
+    <p class="text-muted mb-0">No channels yet.</p>
+    {% endif %}
+  </div>
+</div>
+{% endblock %}
