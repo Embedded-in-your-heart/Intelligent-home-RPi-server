@@ -71,11 +71,12 @@ def test_add_device_persists_with_owner(
     app: Flask, logged_in_client: FlaskClient
 ) -> None:
     token = _csrf_token(logged_in_client, "/devices")
-    logged_in_client.post(
+    resp = logged_in_client.post(
         "/devices",
         data={"address": "AA:BB:CC:DD:EE:FF", "name": "Sensor", "csrf_token": token},
         follow_redirects=True,
     )
+    assert resp.status_code == 200
     conn = connection.connect(app.config["DB_PATH"])
     try:
         device = devices.get_by_address(conn, "AA:BB:CC:DD:EE:FF")
