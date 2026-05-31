@@ -23,6 +23,9 @@
             chart.data.datasets[0].data.push(pt.value);
           });
           chart.update();
+        })
+        .catch(function (err) {
+          console.warn("history fetch failed for channel " + channelId, err);
         });
 
       sock.emit("subscribe_channel", { channel_id: channelId });

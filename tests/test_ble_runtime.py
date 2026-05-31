@@ -71,7 +71,8 @@ def test_notify_persists_reading_and_calls_on_reading(db_path: Path) -> None:
     assert seen and seen[0][1] == 42.0
     conn = connection.connect(db_path)
     try:
-        rows = readings.list_by_channel(conn, 1)  # display channel id == 1
+        disp = next(c for c in channels.list_by_device(conn, 1) if c.char_uuid == DISP_UUID)
+        rows = readings.list_by_channel(conn, disp.id)
     finally:
         conn.close()
     assert [r.value for r in rows] == [42.0]

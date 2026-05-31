@@ -100,6 +100,9 @@ def write_channel(channel_id: int) -> Response:
         get_channel_service().write_command(conn, channel_id=channel_id, raw_value=value)
     except WrongChannelTypeError:
         abort(400)
+    except parser.ParseError:
+        flash("Value out of range for this channel format")
+        return redirect(url_for("devices.detail", device_id=channel.device_id))
     return redirect(url_for("devices.detail", device_id=channel.device_id))
 
 

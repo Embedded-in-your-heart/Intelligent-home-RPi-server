@@ -242,3 +242,42 @@ def test_history_empty(app: Flask, logged_in_client: FlaskClient) -> None:
 def test_history_missing_channel_404(logged_in_client: FlaskClient) -> None:
     resp = logged_in_client.get("/channels/999/history")
     assert resp.status_code == 404
+
+
+def test_write_channel_requires_login(client: FlaskClient) -> None:
+    token = _csrf_token(client, "/auth/login")
+    resp = client.post(
+        "/channels/1/write", data={"value": "1", "csrf_token": token}
+    )
+    assert resp.status_code == 302
+    assert "/auth/login" in resp.headers["Location"]
+
+
+def test_history_requires_login(client: FlaskClient) -> None:
+    resp = client.get("/channels/1/history")
+    assert resp.status_code == 302
+    assert "/auth/login" in resp.headers["Location"]
+
+
+def test_write_out_of_range_value_flashes(
+    app: Flask, logged_in_client: FlaskClient, mock_ble
+) -> None:
+    device_id = _make_device(app, "AA:BB:CC:DD:EE:24", "Lamp3")
+    mock_ble.connect("AA:BB:CC:DD:EE:24")
+    conn = connection.connect(app.config["DB_PATH"])
+    try:
+        channel_id = channels.create(
+            conn, device_id=device_id, name="LED", type="controller",
+            char_uuid="uuid-led", data_format="uint8", unit=None,
+        )
+    finally:
+        conn.close()
+    token = _csrf_token(logged_in_client, f"/devices/{device_id}")
+    resp = logged_in_client.post(
+        f"/channels/{channel_id}/write",
+        data={"value": "256", "csrf_token": token},
+        follow_redirects=True,
+    )
+    assert resp.status_code == 200
+    assert b"Value out of range" in resp.data
+    assert mock_ble.writes_for("AA:BB:CC:DD:EE:24", "uuid-led") == []
