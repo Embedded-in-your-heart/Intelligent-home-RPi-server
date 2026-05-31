@@ -50,7 +50,7 @@ mypy_path = "src"
 explicit_package_bases = true
 
 [[tool.mypy.overrides]]
-module = ["flask_login.*", "flask_wtf.*", "wtforms.*", "bluepy.*"]
+module = ["flask_login.*", "flask_wtf.*", "wtforms.*", "bluepy.*", "flask_socketio.*"]
 ignore_missing_imports = true
 
 # Flask-Login, Flask-WTF, and bluepy ship no type stubs, so their base classes
