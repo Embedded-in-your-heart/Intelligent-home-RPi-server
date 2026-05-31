@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from flask import Blueprint, abort, flash, redirect, render_template, url_for
+from flask import Blueprint, abort, current_app, flash, redirect, render_template, url_for
 from flask_login import current_user, login_required
 from flask_wtf import FlaskForm
 from werkzeug.wrappers import Response
@@ -70,3 +70,10 @@ def delete(device_id: int) -> Response:
     except DeviceNotFoundError:
         abort(404)
     return redirect(url_for("devices.list_devices"))
+
+
+@bp.get("/devices/scan")
+@login_required
+def scan() -> str:
+    found = get_device_service().scan(current_app.config["BLE_SCAN_DURATION"])
+    return render_template("devices/_scan_results.html", found=found)

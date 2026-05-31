@@ -1,0 +1,21 @@
+{% if found %}
+<ul class="list-group">
+  {% for d in found %}
+  <li class="list-group-item d-flex justify-content-between align-items-center flex-wrap gap-2">
+    <span>
+      <code>{{ d.address }}</code>
+      {{ d.name or "(unknown)" }}
+      <small class="text-muted">{{ d.rssi }} dBm</small>
+    </span>
+    <form method="post" action="{{ url_for('devices.list_devices') }}" class="d-flex gap-2">
+      <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+      <input type="hidden" name="address" value="{{ d.address }}">
+      <input class="form-control form-control-sm" name="name" value="{{ d.name or d.address }}">
+      <button class="btn btn-sm btn-primary" type="submit">Add</button>
+    </form>
+  </li>
+  {% endfor %}
+</ul>
+{% else %}
+<p class="text-muted mb-0">No devices found.</p>
+{% endif %}
