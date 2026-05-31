@@ -1,3 +1,5 @@
+import time
+
 import pytest
 
 from home_server.ble.interface import BLEManager, DiscoveredDevice
@@ -110,3 +112,35 @@ def test_simulate_disconnect_keeps_subscription_but_marks_offline() -> None:
     mgr.subscribe("aa:bb", "uuid", lambda _: None)
     mgr.simulate_disconnect("aa:bb")
     assert not mgr.is_connected("aa:bb")
+
+
+def test_tick_emits_to_subscriber() -> None:
+    mgr = MockBLEManager()
+    mgr.connect("aa:bb")
+    received: list[bytes] = []
+    mgr.subscribe("aa:bb", "uuid-x", received.append)
+    mgr._tick(lambda address, char_uuid: b"\x07")
+    assert received == [b"\x07"]
+
+
+def test_tick_skips_when_feed_returns_none() -> None:
+    mgr = MockBLEManager()
+    mgr.connect("aa:bb")
+    received: list[bytes] = []
+    mgr.subscribe("aa:bb", "uuid-x", received.append)
+    mgr._tick(lambda address, char_uuid: None)
+    assert received == []
+
+
+def test_start_then_stop_emits_and_terminates() -> None:
+    mgr = MockBLEManager()
+    mgr.connect("aa:bb")
+    received: list[bytes] = []
+    mgr.subscribe("aa:bb", "uuid-x", received.append)
+    mgr.start(lambda address, char_uuid: b"\x01", interval_s=0.01)
+    time.sleep(0.05)
+    thread = mgr._producer_thread
+    mgr.stop()
+    assert len(received) >= 1
+    assert mgr._producer_thread is None
+    assert thread is not None and not thread.is_alive()

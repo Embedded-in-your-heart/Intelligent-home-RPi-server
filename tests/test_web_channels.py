@@ -3,7 +3,7 @@ import re
 from flask import Flask
 from flask.testing import FlaskClient
 
-from home_server.db import channels, connection, devices
+from home_server.db import channels, connection, devices, readings
 
 
 def _csrf_token(client: FlaskClient, path: str) -> str:
@@ -128,3 +128,156 @@ def test_delete_channel_requires_login(client: FlaskClient) -> None:
     resp = client.post("/channels/1/delete", data={"csrf_token": token})
     assert resp.status_code == 302
     assert "/auth/login" in resp.headers["Location"]
+
+
+def test_write_controller_sends_encoded_bytes(
+    app: Flask, logged_in_client: FlaskClient, mock_ble
+) -> None:
+    device_id = _make_device(app, "AA:BB:CC:DD:EE:21", "Lamp")
+    mock_ble.connect("AA:BB:CC:DD:EE:21")  # write() requires a connected handle
+    conn = connection.connect(app.config["DB_PATH"])
+    try:
+        channel_id = channels.create(
+            conn, device_id=device_id, name="LED", type="controller",
+            char_uuid="uuid-led", data_format="uint8", unit=None,
+        )
+    finally:
+        conn.close()
+    token = _csrf_token(logged_in_client, f"/devices/{device_id}")
+    resp = logged_in_client.post(
+        f"/channels/{channel_id}/write",
+        data={"value": "1", "csrf_token": token},
+        follow_redirects=True,
+    )
+    assert resp.status_code == 200
+    assert mock_ble.writes_for("AA:BB:CC:DD:EE:21", "uuid-led") == [b"\x01"]
+
+
+def test_write_display_channel_rejected(
+    app: Flask, logged_in_client: FlaskClient
+) -> None:
+    device_id = _make_device(app, "AA:BB:CC:DD:EE:22", "Sensor")
+    conn = connection.connect(app.config["DB_PATH"])
+    try:
+        channel_id = channels.create(
+            conn, device_id=device_id, name="Temp", type="display",
+            char_uuid="uuid-t", data_format="uint8", unit=None,
+        )
+    finally:
+        conn.close()
+    token = _csrf_token(logged_in_client, f"/devices/{device_id}")
+    resp = logged_in_client.post(
+        f"/channels/{channel_id}/write",
+        data={"value": "1", "csrf_token": token},
+    )
+    assert resp.status_code == 400
+
+
+def test_write_non_numeric_value_flashes(
+    app: Flask, logged_in_client: FlaskClient
+) -> None:
+    device_id = _make_device(app, "AA:BB:CC:DD:EE:23", "Lamp2")
+    conn = connection.connect(app.config["DB_PATH"])
+    try:
+        channel_id = channels.create(
+            conn, device_id=device_id, name="LED", type="controller",
+            char_uuid="uuid-led", data_format="uint8", unit=None,
+        )
+    finally:
+        conn.close()
+    token = _csrf_token(logged_in_client, f"/devices/{device_id}")
+    resp = logged_in_client.post(
+        f"/channels/{channel_id}/write",
+        data={"value": "abc", "csrf_token": token},
+        follow_redirects=True,
+    )
+    assert resp.status_code == 200
+    assert b"Value must be a number" in resp.data
+
+
+def test_write_missing_channel_404(logged_in_client: FlaskClient) -> None:
+    token = _csrf_token(logged_in_client, "/devices")
+    resp = logged_in_client.post(
+        "/channels/999/write", data={"value": "1", "csrf_token": token}
+    )
+    assert resp.status_code == 404
+
+
+def test_history_returns_readings_oldest_first(
+    app: Flask, logged_in_client: FlaskClient
+) -> None:
+    device_id = _make_device(app, "AA:BB:CC:DD:EE:31", "Sensor")
+    conn = connection.connect(app.config["DB_PATH"])
+    try:
+        channel_id = channels.create(
+            conn, device_id=device_id, name="Temp", type="display",
+            char_uuid="uuid-t", data_format="uint8", unit="C",
+        )
+        readings.insert(conn, channel_id=channel_id, value=24.5)
+        readings.insert(conn, channel_id=channel_id, value=25.0)
+    finally:
+        conn.close()
+    resp = logged_in_client.get(f"/channels/{channel_id}/history")
+    assert resp.status_code == 200
+    body = resp.get_json()
+    assert body["channel_id"] == channel_id
+    assert [r["value"] for r in body["readings"]] == [24.5, 25.0]
+
+
+def test_history_empty(app: Flask, logged_in_client: FlaskClient) -> None:
+    device_id = _make_device(app, "AA:BB:CC:DD:EE:32", "Sensor2")
+    conn = connection.connect(app.config["DB_PATH"])
+    try:
+        channel_id = channels.create(
+            conn, device_id=device_id, name="Temp", type="display",
+            char_uuid="uuid-t", data_format="uint8", unit=None,
+        )
+    finally:
+        conn.close()
+    resp = logged_in_client.get(f"/channels/{channel_id}/history")
+    assert resp.status_code == 200
+    assert resp.get_json()["readings"] == []
+
+
+def test_history_missing_channel_404(logged_in_client: FlaskClient) -> None:
+    resp = logged_in_client.get("/channels/999/history")
+    assert resp.status_code == 404
+
+
+def test_write_channel_requires_login(client: FlaskClient) -> None:
+    token = _csrf_token(client, "/auth/login")
+    resp = client.post(
+        "/channels/1/write", data={"value": "1", "csrf_token": token}
+    )
+    assert resp.status_code == 302
+    assert "/auth/login" in resp.headers["Location"]
+
+
+def test_history_requires_login(client: FlaskClient) -> None:
+    resp = client.get("/channels/1/history")
+    assert resp.status_code == 302
+    assert "/auth/login" in resp.headers["Location"]
+
+
+def test_write_out_of_range_value_flashes(
+    app: Flask, logged_in_client: FlaskClient, mock_ble
+) -> None:
+    device_id = _make_device(app, "AA:BB:CC:DD:EE:24", "Lamp3")
+    mock_ble.connect("AA:BB:CC:DD:EE:24")
+    conn = connection.connect(app.config["DB_PATH"])
+    try:
+        channel_id = channels.create(
+            conn, device_id=device_id, name="LED", type="controller",
+            char_uuid="uuid-led", data_format="uint8", unit=None,
+        )
+    finally:
+        conn.close()
+    token = _csrf_token(logged_in_client, f"/devices/{device_id}")
+    resp = logged_in_client.post(
+        f"/channels/{channel_id}/write",
+        data={"value": "256", "csrf_token": token},
+        follow_redirects=True,
+    )
+    assert resp.status_code == 200
+    assert b"Value out of range" in resp.data
+    assert mock_ble.writes_for("AA:BB:CC:DD:EE:24", "uuid-led") == []

@@ -2,35 +2,82 @@
 
 from __future__ import annotations
 
+from typing import Any
+
 from flask import Flask, g, render_template
-from flask_login import LoginManager, login_required
+from flask_login import LoginManager, current_user, login_required
+from flask_socketio import SocketIO, join_room, leave_room
 from flask_wtf import CSRFProtect
 
 from home_server.ble.interface import BLEManager
 from home_server.ble.mock_manager import MockBLEManager
 from home_server.ble.rate_limiter import RateLimiter
 from home_server.config import Config
-from home_server.db import users
+from home_server.db import channels as db_channels
+from home_server.db import connection, users
+from home_server.db import devices as db_devices
+from home_server.services.ble_runtime import BleRuntime
 from home_server.services.channel_service import ChannelService
 from home_server.services.device_service import DeviceService
 from home_server.web.db import get_conn
-from home_server.web.services import CHANNEL_SERVICE_KEY, DEVICE_SERVICE_KEY
+from home_server.web.services import (
+    BLE_RUNTIME_KEY,
+    CHANNEL_SERVICE_KEY,
+    DEVICE_SERVICE_KEY,
+)
+
+socketio = SocketIO()
 
 
-def _noop_reading(channel_id: int, value: float, timestamp: str) -> None:
-    """Placeholder UI push. Phase 3e replaces this with a SocketIO emit."""
+def _emit_reading(channel_id: int, value: float, timestamp: str) -> None:
+    """UI push: send each notify to the per-channel SocketIO room."""
+    socketio.emit(
+        "reading",
+        {"channel_id": channel_id, "value": value, "timestamp": timestamp},
+        room=f"channel:{channel_id}",
+    )
+
+
+@socketio.on("connect")
+def _on_connect() -> bool:
+    """Reject anonymous WebSocket clients (all HTTP routes require login too)."""
+    return bool(current_user.is_authenticated)
+
+
+@socketio.on("subscribe_channel")
+def _on_subscribe_channel(data: dict[str, Any]) -> None:
+    channel_id = data.get("channel_id")
+    if channel_id is not None:
+        join_room(f"channel:{channel_id}")
+
+
+@socketio.on("unsubscribe_channel")
+def _on_unsubscribe_channel(data: dict[str, Any]) -> None:
+    channel_id = data.get("channel_id")
+    if channel_id is not None:
+        leave_room(f"channel:{channel_id}")
 
 
 def create_app(config: Config, ble: BLEManager | None = None) -> Flask:
     app = Flask(__name__)
     app.config["SECRET_KEY"] = config.secret_key
     app.config["DB_PATH"] = config.db_path
+    app.config["BLE_SCAN_DURATION"] = config.ble_scan_duration
+
+    socketio.init_app(app, async_mode="threading")
 
     if ble is None:
         ble = MockBLEManager()
     limiter = RateLimiter(config.reading_min_interval)
+    channel_service = ChannelService(ble, limiter, _emit_reading)
     app.extensions[DEVICE_SERVICE_KEY] = DeviceService(ble)
-    app.extensions[CHANNEL_SERVICE_KEY] = ChannelService(ble, limiter, _noop_reading)
+    app.extensions[CHANNEL_SERVICE_KEY] = channel_service
+    app.extensions[BLE_RUNTIME_KEY] = BleRuntime(
+        ble,
+        channel_service,
+        conn_factory=lambda: connection.connect(config.db_path),
+        scan_duration=config.ble_scan_duration,
+    )
 
     login_manager = LoginManager()
     login_manager.init_app(app)
@@ -58,7 +105,11 @@ def create_app(config: Config, ble: BLEManager | None = None) -> Flask:
     @app.get("/")
     @login_required
     def index() -> str:
-        return render_template("index.html")
+        conn = get_conn()
+        overview = [
+            (d, db_channels.list_by_device(conn, d.id)) for d in db_devices.list_all(conn)
+        ]
+        return render_template("index.html", overview=overview)
 
     @app.get("/health")
     def health() -> dict[str, str]:

@@ -3,6 +3,7 @@ import re
 from flask import Flask
 from flask.testing import FlaskClient
 
+from home_server.ble.interface import DiscoveredDevice
 from home_server.db import channels, connection, devices
 
 
@@ -172,3 +173,22 @@ def test_post_without_csrf_rejected(logged_in_client: FlaskClient) -> None:
         data={"address": "AA:BB:CC:DD:EE:09", "name": "NoCSRF"},
     )
     assert resp.status_code == 400
+
+
+def test_scan_lists_discovered_devices(
+    logged_in_client: FlaskClient, mock_ble
+) -> None:
+    mock_ble.scan_results = [
+        DiscoveredDevice(address="11:22:33:44:55:66", name="Node-A", rssi=-50)
+    ]
+    resp = logged_in_client.get("/devices/scan")
+    assert resp.status_code == 200
+    body = resp.get_data(as_text=True)
+    assert "11:22:33:44:55:66" in body
+    assert "Node-A" in body
+
+
+def test_scan_requires_login(client: FlaskClient) -> None:
+    resp = client.get("/devices/scan")
+    assert resp.status_code == 302
+    assert "/auth/login" in resp.headers["Location"]
