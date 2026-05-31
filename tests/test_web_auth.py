@@ -41,7 +41,7 @@ def test_register_then_access_index(client) -> None:
         follow_redirects=True,
     )
     assert resp.status_code == 200
-    assert b"Logged in as alice" in resp.data
+    assert b"Dashboard" in resp.data
 
 
 def test_register_duplicate_shows_error(client) -> None:
@@ -93,7 +93,7 @@ def test_login_logout_flow(client) -> None:
         follow_redirects=True,
     )
     assert resp.status_code == 200
-    assert b"Logged in as bob" in resp.data
+    assert b"Dashboard" in resp.data
 
 
 def test_login_wrong_password_shows_error(client) -> None:

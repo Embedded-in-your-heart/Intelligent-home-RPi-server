@@ -1,10 +1,44 @@
 {% extends "base.html" %}
 {% block title %}Dashboard{% endblock %}
 {% block content %}
-<div class="card shadow-sm">
-  <div class="card-body">
-    <h1 class="card-title h4">Dashboard</h1>
-    <p class="card-text mb-0">Logged in as {{ current_user.username }}</p>
+<h1 class="h4 mb-3">Dashboard</h1>
+
+{% if overview %}
+  {% for device, device_channels in overview %}
+  <div class="card shadow-sm mb-4">
+    <div class="card-body">
+      <h2 class="card-title h5">
+        <a href="{{ url_for('devices.detail', device_id=device.id) }}">{{ device.name }}</a>
+        <small class="text-muted"><code>{{ device.address }}</code></small>
+      </h2>
+      {% if device_channels %}
+        {% for channel in device_channels %}
+        <div class="mb-3">
+          <h3 class="h6">{{ channel.name }} <small class="text-muted">({{ channel.type }})</small></h3>
+          {% if channel.type == "display" %}
+          <canvas data-channel-id="{{ channel.id }}" data-unit="{{ channel.unit or '' }}" height="70"></canvas>
+          {% else %}
+          <form method="post"
+                action="{{ url_for('channels.write_channel', channel_id=channel.id) }}"
+                class="row g-2">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+            <div class="col-auto">
+              <input class="form-control form-control-sm" name="value" placeholder="value" required>
+            </div>
+            <div class="col-auto">
+              <button class="btn btn-sm btn-primary" type="submit">Send</button>
+            </div>
+          </form>
+          {% endif %}
+        </div>
+        {% endfor %}
+      {% else %}
+        <p class="text-muted mb-0">No channels.</p>
+      {% endif %}
+    </div>
   </div>
-</div>
+  {% endfor %}
+{% else %}
+  <p class="text-muted">No devices yet. <a href="{{ url_for('devices.list_devices') }}">Add one</a>.</p>
+{% endif %}
 {% endblock %}

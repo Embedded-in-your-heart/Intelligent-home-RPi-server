@@ -44,6 +44,34 @@
   </div>
 </div>
 
+{% if channels %}
+<div class="card shadow-sm mb-4">
+  <div class="card-body">
+    <h2 class="card-title h5 mb-3">Live &amp; control</h2>
+    {% for channel in channels %}
+    <div class="mb-4">
+      <h3 class="h6">{{ channel.name }} <small class="text-muted">({{ channel.type }})</small></h3>
+      {% if channel.type == "display" %}
+      <canvas data-channel-id="{{ channel.id }}" data-unit="{{ channel.unit or '' }}" height="80"></canvas>
+      {% else %}
+      <form method="post"
+            action="{{ url_for('channels.write_channel', channel_id=channel.id) }}"
+            class="row g-2">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+        <div class="col-auto">
+          <input class="form-control form-control-sm" name="value" placeholder="value" required>
+        </div>
+        <div class="col-auto">
+          <button class="btn btn-sm btn-primary" type="submit">Send</button>
+        </div>
+      </form>
+      {% endif %}
+    </div>
+    {% endfor %}
+  </div>
+</div>
+{% endif %}
+
 <div class="card shadow-sm">
   <div class="card-body">
     <h2 class="card-title h5 mb-3">Add channel</h2>
