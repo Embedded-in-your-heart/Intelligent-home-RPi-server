@@ -54,11 +54,15 @@ def detail(device_id: int) -> str:
     if device is None:
         abort(404)
     device_channels = get_channel_service().list_by_device(conn, device_id)
+    status = (
+        "connected" if get_device_service().is_connected(device.address) else "disconnected"
+    )
     return render_template(
         "devices/detail.html",
         device=device,
         channels=device_channels,
         formats=parser.supported_formats(),
+        device_status=status,
     )
 
 

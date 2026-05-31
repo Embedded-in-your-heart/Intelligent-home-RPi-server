@@ -5,7 +5,7 @@ from flask.testing import FlaskClient
 
 from home_server.db import channels, connection, devices, users
 from home_server.web import socketio
-from home_server.web.services import get_channel_service
+from home_server.web.services import get_ble_runtime, get_channel_service
 
 ADDR = "AA:BB:CC:DD:EE:FF"
 DISP_UUID = "uuid-disp"
@@ -58,3 +58,20 @@ def test_reading_not_pushed_without_subscription(app: Flask, logged_in_client: F
 def test_unauthenticated_socket_rejected(app: Flask) -> None:
     ws = socketio.test_client(app)
     assert not ws.is_connected()
+
+
+def test_device_status_pushed_to_client(app: Flask, logged_in_client: FlaskClient) -> None:
+    conn = connection.connect(app.config["DB_PATH"])
+    try:
+        uid = users.create(conn, username="u2", password_hash="x")
+        did = devices.create(
+            conn, address="C0:DE:00:00:00:01", name="d2", owner_user_id=uid
+        )
+    finally:
+        conn.close()
+    ws = socketio.test_client(app, flask_test_client=logged_in_client)
+    with app.app_context():
+        get_ble_runtime()._monitor_tick(0.0)  # device not connected -> "disconnected"
+    events = [e for e in ws.get_received() if e["name"] == "device_status"]
+    assert events, "expected a device_status event"
+    assert events[0]["args"][0] == {"device_id": did, "status": "disconnected"}

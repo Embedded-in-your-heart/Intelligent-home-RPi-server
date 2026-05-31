@@ -82,3 +82,11 @@ def test_remove_device_not_connected_just_deletes(db_conn, owner) -> None:
     assert not mock.is_connected(ADDR)
     svc.remove_device(db_conn, device.id)
     assert devices.get_by_id(db_conn, device.id) is None
+
+
+def test_is_connected_reflects_ble() -> None:
+    mock = MockBLEManager()
+    svc = DeviceService(mock)
+    assert svc.is_connected(ADDR) is False
+    mock.connect(ADDR)
+    assert svc.is_connected(ADDR) is True

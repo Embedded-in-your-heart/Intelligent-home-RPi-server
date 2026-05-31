@@ -68,3 +68,6 @@ class DeviceService:
 
     def list_devices(self, conn: sqlite3.Connection) -> list[Device]:
         return devices.list_all(conn)
+
+    def is_connected(self, address: str) -> bool:
+        return self._ble.is_connected(address)

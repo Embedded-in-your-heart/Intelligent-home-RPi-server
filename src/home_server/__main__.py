@@ -3,9 +3,11 @@
 from __future__ import annotations
 
 import logging
+import sys
 
 from home_server.ble.interface import DiscoveredDevice
 from home_server.ble.mock_manager import MockBLEManager
+from home_server.ble.selection import select_ble_manager
 from home_server.config import Config
 from home_server.core.logging import setup_logging
 from home_server.db import connection
@@ -41,12 +43,13 @@ def main() -> None:
     connection.initialize(config.db_path)
     _seed_admin(config, log)
 
-    ble = MockBLEManager()
-    # Dev demo: a couple of discoverable devices so the Scan button shows output.
-    ble.scan_results = [
-        DiscoveredDevice(address="C0:FF:EE:00:00:01", name="Demo Sensor", rssi=-55),
-        DiscoveredDevice(address="C0:FF:EE:00:00:02", name="Demo Lamp", rssi=-61),
-    ]
+    ble = select_ble_manager(config.ble_backend, sys.platform)
+    if isinstance(ble, MockBLEManager):
+        # Dev demo: discoverable devices so the Scan button shows output.
+        ble.scan_results = [
+            DiscoveredDevice(address="C0:FF:EE:00:00:01", name="Demo Sensor", rssi=-55),
+            DiscoveredDevice(address="C0:FF:EE:00:00:02", name="Demo Lamp", rssi=-61),
+        ]
     app = create_app(config, ble=ble)
 
     with app.app_context():
@@ -54,6 +57,7 @@ def main() -> None:
         runtime.activate()
         if isinstance(ble, MockBLEManager):
             ble.start(runtime.make_feed(), interval_s=1.0)
+        runtime.monitor_start(interval_s=1.0)
 
     log.info(
         "Starting server on %s:%d (debug=%s)", config.host, config.port, config.debug

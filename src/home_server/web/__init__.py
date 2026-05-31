@@ -38,6 +38,11 @@ def _emit_reading(channel_id: int, value: float, timestamp: str) -> None:
     )
 
 
+def _emit_device_status(device_id: int, status: str) -> None:
+    """UI push: broadcast a device connection-status change to all clients."""
+    socketio.emit("device_status", {"device_id": device_id, "status": status})
+
+
 @socketio.on("connect")
 def _on_connect() -> bool:
     """Reject anonymous WebSocket clients (all HTTP routes require login too)."""
@@ -70,13 +75,15 @@ def create_app(config: Config, ble: BLEManager | None = None) -> Flask:
         ble = MockBLEManager()
     limiter = RateLimiter(config.reading_min_interval)
     channel_service = ChannelService(ble, limiter, _emit_reading)
-    app.extensions[DEVICE_SERVICE_KEY] = DeviceService(ble)
+    device_service = DeviceService(ble)
+    app.extensions[DEVICE_SERVICE_KEY] = device_service
     app.extensions[CHANNEL_SERVICE_KEY] = channel_service
     app.extensions[BLE_RUNTIME_KEY] = BleRuntime(
         ble,
         channel_service,
         conn_factory=lambda: connection.connect(config.db_path),
         scan_duration=config.ble_scan_duration,
+        on_status=_emit_device_status,
     )
 
     login_manager = LoginManager()
@@ -107,7 +114,12 @@ def create_app(config: Config, ble: BLEManager | None = None) -> Flask:
     def index() -> str:
         conn = get_conn()
         overview = [
-            (d, db_channels.list_by_device(conn, d.id)) for d in db_devices.list_all(conn)
+            (
+                d,
+                "connected" if device_service.is_connected(d.address) else "disconnected",
+                db_channels.list_by_device(conn, d.id),
+            )
+            for d in db_devices.list_all(conn)
         ]
         return render_template("index.html", overview=overview)
 

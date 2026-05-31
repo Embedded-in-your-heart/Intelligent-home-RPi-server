@@ -74,3 +74,19 @@ def test_index_dashboard_lists_channels(
     body = logged_in_client.get("/").get_data(as_text=True)
     assert "Humidity" in body
     assert f'data-channel-id="{channel_id}"' in body
+
+
+def test_detail_shows_device_status_badge(
+    app: Flask, logged_in_client: FlaskClient
+) -> None:
+    device_id = _make_device(app, "AA:BB:CC:DD:EE:51", "Sensor3")
+    body = logged_in_client.get(f"/devices/{device_id}").get_data(as_text=True)
+    assert f'data-device-id="{device_id}"' in body
+
+
+def test_index_shows_device_status_badge(
+    app: Flask, logged_in_client: FlaskClient
+) -> None:
+    device_id = _make_device(app, "AA:BB:CC:DD:EE:52", "Sensor4")
+    body = logged_in_client.get("/").get_data(as_text=True)
+    assert f'data-device-id="{device_id}"' in body
