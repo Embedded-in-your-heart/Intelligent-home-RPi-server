@@ -38,6 +38,11 @@ def _emit_reading(channel_id: int, value: float, timestamp: str) -> None:
     )
 
 
+def _emit_device_status(device_id: int, status: str) -> None:
+    """UI push: broadcast a device connection-status change to all clients."""
+    socketio.emit("device_status", {"device_id": device_id, "status": status})
+
+
 @socketio.on("connect")
 def _on_connect() -> bool:
     """Reject anonymous WebSocket clients (all HTTP routes require login too)."""
@@ -77,6 +82,7 @@ def create_app(config: Config, ble: BLEManager | None = None) -> Flask:
         channel_service,
         conn_factory=lambda: connection.connect(config.db_path),
         scan_duration=config.ble_scan_duration,
+        on_status=_emit_device_status,
     )
 
     login_manager = LoginManager()
