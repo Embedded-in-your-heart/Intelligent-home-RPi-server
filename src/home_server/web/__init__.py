@@ -5,7 +5,7 @@ from __future__ import annotations
 from typing import Any
 
 from flask import Flask, g, render_template
-from flask_login import LoginManager, login_required
+from flask_login import LoginManager, current_user, login_required
 from flask_socketio import SocketIO, join_room, leave_room
 from flask_wtf import CSRFProtect
 
@@ -36,6 +36,12 @@ def _emit_reading(channel_id: int, value: float, timestamp: str) -> None:
         {"channel_id": channel_id, "value": value, "timestamp": timestamp},
         room=f"channel:{channel_id}",
     )
+
+
+@socketio.on("connect")
+def _on_connect() -> bool:
+    """Reject anonymous WebSocket clients (all HTTP routes require login too)."""
+    return bool(current_user.is_authenticated)
 
 
 @socketio.on("subscribe_channel")
