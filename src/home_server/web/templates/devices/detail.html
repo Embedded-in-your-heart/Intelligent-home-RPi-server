@@ -5,7 +5,10 @@
 
 <div class="card shadow-sm mb-4">
   <div class="card-body">
-    <h1 class="card-title h4">{{ device.name }}</h1>
+    <h1 class="card-title h4">{{ device.name }}
+      <span class="badge {{ {'connected':'bg-success','reconnecting':'bg-warning','disconnected':'bg-secondary'}.get(device_status, 'bg-secondary') }}"
+            data-device-id="{{ device.id }}">{{ device_status }}</span>
+    </h1>
     <p class="card-text mb-0"><code>{{ device.address }}</code></p>
   </div>
 </div>

@@ -75,7 +75,8 @@ def create_app(config: Config, ble: BLEManager | None = None) -> Flask:
         ble = MockBLEManager()
     limiter = RateLimiter(config.reading_min_interval)
     channel_service = ChannelService(ble, limiter, _emit_reading)
-    app.extensions[DEVICE_SERVICE_KEY] = DeviceService(ble)
+    device_service = DeviceService(ble)
+    app.extensions[DEVICE_SERVICE_KEY] = device_service
     app.extensions[CHANNEL_SERVICE_KEY] = channel_service
     app.extensions[BLE_RUNTIME_KEY] = BleRuntime(
         ble,
@@ -113,7 +114,12 @@ def create_app(config: Config, ble: BLEManager | None = None) -> Flask:
     def index() -> str:
         conn = get_conn()
         overview = [
-            (d, db_channels.list_by_device(conn, d.id)) for d in db_devices.list_all(conn)
+            (
+                d,
+                "connected" if device_service.is_connected(d.address) else "disconnected",
+                db_channels.list_by_device(conn, d.id),
+            )
+            for d in db_devices.list_all(conn)
         ]
         return render_template("index.html", overview=overview)
 

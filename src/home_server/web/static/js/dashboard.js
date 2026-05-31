@@ -1,10 +1,17 @@
 (function () {
-  function initCharts() {
-    var canvases = document.querySelectorAll("canvas[data-channel-id]");
-    if (canvases.length === 0) return;
+  function init() {
     var sock = io();
-    var charts = {};
 
+    sock.on("device_status", function (d) {
+      var cls = { connected: "bg-success", reconnecting: "bg-warning", disconnected: "bg-secondary" }[d.status] || "bg-secondary";
+      document.querySelectorAll('[data-device-id="' + d.device_id + '"]').forEach(function (b) {
+        b.textContent = d.status;
+        b.className = "badge " + cls;
+      });
+    });
+
+    var canvases = document.querySelectorAll("canvas[data-channel-id]");
+    var charts = {};
     canvases.forEach(function (canvas) {
       var channelId = parseInt(canvas.getAttribute("data-channel-id"), 10);
       var unit = canvas.getAttribute("data-unit") || "value";
@@ -45,8 +52,8 @@
   }
 
   if (document.readyState === "loading") {
-    document.addEventListener("DOMContentLoaded", initCharts);
+    document.addEventListener("DOMContentLoaded", init);
   } else {
-    initCharts();
+    init();
   }
 })();
