@@ -11,6 +11,7 @@ import pytest
 from flask import Flask
 from flask.testing import FlaskClient
 
+from home_server.ble.mock_manager import MockBLEManager
 from home_server.config import Config
 from home_server.db import connection
 from home_server.web import create_app
@@ -32,7 +33,13 @@ def db_conn() -> Iterator[sqlite3.Connection]:
 
 
 @pytest.fixture
-def app(tmp_path: Path) -> Flask:
+def mock_ble() -> MockBLEManager:
+    """Shared MockBLEManager so tests can set scan_results and assert on writes."""
+    return MockBLEManager()
+
+
+@pytest.fixture
+def app(tmp_path: Path, mock_ble: MockBLEManager) -> Flask:
     # File-backed DB (not :memory:) so each per-request connection sees the
     # same database — distinct :memory: connections would each be empty.
     db_path = tmp_path / "test.db"
@@ -49,7 +56,7 @@ def app(tmp_path: Path) -> Flask:
         admin_password=None,
         debug=True,
     )
-    flask_app = create_app(config)
+    flask_app = create_app(config, ble=mock_ble)
     flask_app.config["TESTING"] = True
     return flask_app
 
