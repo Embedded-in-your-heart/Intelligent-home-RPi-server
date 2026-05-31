@@ -6,6 +6,7 @@ from flask import (
     Blueprint,
     abort,
     flash,
+    jsonify,
     redirect,
     render_template,
     request,
@@ -100,3 +101,23 @@ def write_channel(channel_id: int) -> Response:
     except WrongChannelTypeError:
         abort(400)
     return redirect(url_for("devices.detail", device_id=channel.device_id))
+
+
+@bp.get("/channels/<int:channel_id>/history")
+@login_required
+def channel_history(channel_id: int) -> Response:
+    conn = get_conn()
+    channel = channels.get_by_id(conn, channel_id)
+    if channel is None:
+        abort(404)
+    limit_raw = request.args.get("limit", type=int)
+    limit = 200 if limit_raw is None else max(1, min(limit_raw, 1000))
+    history = get_channel_service().get_history(conn, channel_id, limit=limit)
+    return jsonify(
+        {
+            "channel_id": channel_id,
+            "readings": [
+                {"value": r.value, "recorded_at": r.recorded_at} for r in history
+            ],
+        }
+    )
