@@ -102,10 +102,6 @@ task clean           # 清除 caches 與 dev SQLite
 - `web/templates/`：`base` / `index` / `auth/login` / `auth/register` 陽春模板（含 CSRF）
 - 已可從瀏覽器完成「註冊 → 自動登入 → 登出」全流程
 
-**測試與品質：** 103 unit tests passing、`ruff check` 與 `mypy src`（strict）全綠。
-
-### 🚧 進行中 / 未完成
-
 **Phase 3d：Device / Channel CRUD Blueprint**
 - `/devices`（列表、掃描、新增、刪除）
 - `/devices/<id>/channels`（新增、刪除）
@@ -115,6 +111,10 @@ task clean           # 清除 caches 與 dev SQLite
 - Flask-SocketIO（threading 模式），與 bluepy worker thread 串接
 - 監控型頻道即時推播（每個頻道一個 room）
 - Jinja2 + HTMX 模板、Chart.js 歷史趨勢圖
+
+**測試與品質：** 190 unit tests passing、`ruff check` 與 `mypy src`（strict）全綠。
+
+### 🚧 進行中 / 未完成
 
 **Phase 4：整合測試與部署**
 - 多 STM32 節點分散式佈署測試
