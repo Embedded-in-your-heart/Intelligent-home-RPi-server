@@ -250,3 +250,28 @@ def test_scan_results_include_addr_type_hidden_input(
     body = logged_in_client.get("/devices/scan").get_data(as_text=True)
     assert 'name="addr_type"' in body
     assert 'value="random"' in body
+
+
+def test_add_device_form_addr_type_overrides_inference(
+    app: Flask, logged_in_client: FlaskClient
+) -> None:
+    # f6:... infers "random"; an explicit form addr_type must take precedence,
+    # proving the scanned value (not inference) is what gets persisted.
+    token = _csrf_token(logged_in_client, "/devices")
+    logged_in_client.post(
+        "/devices",
+        data={
+            "address": "f6:8c:f2:d3:ea:e7",
+            "name": "STM",
+            "addr_type": "public",
+            "csrf_token": token,
+        },
+        follow_redirects=True,
+    )
+    conn = connection.connect(app.config["DB_PATH"])
+    try:
+        device = devices.get_by_address(conn, "f6:8c:f2:d3:ea:e7")
+    finally:
+        conn.close()
+    assert device is not None
+    assert device.addr_type == "public"
