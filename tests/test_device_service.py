@@ -131,3 +131,19 @@ def test_add_device_uses_explicit_addr_type(db_conn, owner) -> None:
     )
     assert d.addr_type == "public"
     assert mock.connect_calls == [(RANDOM_ADDR, "public")]
+
+
+def test_add_device_coerces_invalid_addr_type_to_inference(db_conn, owner) -> None:
+    # A tampered request could supply a value outside the CHECK allowlist; it
+    # must be coerced (here: inferred -> "random") rather than raising on insert.
+    mock = MockBLEManager()
+    svc = DeviceService(mock)
+    d = svc.add_device(
+        db_conn,
+        owner_user_id=owner,
+        address=RANDOM_ADDR,
+        name="stm",
+        addr_type="garbage",
+    )
+    assert d.addr_type == "random"
+    assert mock.connect_calls == [(RANDOM_ADDR, "random")]

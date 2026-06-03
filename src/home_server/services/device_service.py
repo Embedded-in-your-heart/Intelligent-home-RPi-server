@@ -11,7 +11,7 @@ import logging
 import re
 import sqlite3
 
-from home_server.ble.address import infer_addr_type
+from home_server.ble.address import ADDR_TYPE_PUBLIC, ADDR_TYPE_RANDOM, infer_addr_type
 from home_server.ble.interface import BLEManager, DiscoveredDevice
 from home_server.db import devices
 from home_server.db.devices import Device, DeviceNotFoundError
@@ -52,7 +52,13 @@ class DeviceService:
     ) -> Device:
         if not _MAC_RE.match(address):
             raise InvalidAddressError(f"invalid BLE address: {address!r}")
-        resolved_addr_type = addr_type or infer_addr_type(address)
+        # Honour an explicit, valid addr_type; otherwise infer from the address.
+        # Coercing unknown values (only reachable via a tampered request) avoids
+        # an uncaught CHECK-constraint IntegrityError on insert.
+        if addr_type in (ADDR_TYPE_PUBLIC, ADDR_TYPE_RANDOM):
+            resolved_addr_type = addr_type
+        else:
+            resolved_addr_type = infer_addr_type(address)
         device_id = devices.create(
             conn,
             address=address,
