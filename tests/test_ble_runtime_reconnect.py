@@ -118,6 +118,48 @@ def test_controller_only_device_reconnects(tmp_path: Path) -> None:
     assert statuses[-1][1] == "connected"
 
 
+class _LinkNeverUpBLE(MockBLEManager):
+    """connect() returns success but the link never actually comes up.
+
+    Mirrors BluepyManager.connect() reusing an in-flight worker (is_alive but
+    not yet connected): the call returns without raising, yet is_connected()
+    stays False. A powered-off device exhibits exactly this.
+    """
+
+    def connect(self, address: str, addr_type: str = "public"):  # type: ignore[override]
+        self.connect_calls.append((address, addr_type))
+        return address  # NOTE: deliberately does NOT mark the device connected
+
+
+def test_powered_off_device_does_not_flap_connected(tmp_path: Path) -> None:
+    # Regression: a device whose connect() succeeds but never links up (powered
+    # off / in-flight worker) must never be reported 'connected' and must not
+    # oscillate connected<->disconnected.
+    path = tmp_path / "rt.db"
+    _seed(path, with_display=False, with_controller=True)
+    ble = _LinkNeverUpBLE()
+    rt, statuses = _runtime(path, ble)
+    for t in (0.0, 1.0, 2.0, 4.0, 8.0):
+        rt._monitor_tick(t)
+    seen = [s for _, s in statuses]
+    assert "connected" not in seen, seen
+    assert seen[-1] == "reconnecting"
+
+
+def test_reconnect_with_display_channel_does_not_raise_when_link_down(
+    tmp_path: Path,
+) -> None:
+    # A premature-success connect() must not lead to subscribing on an
+    # unconnected link (which would raise and crash the monitor tick).
+    path = tmp_path / "rt.db"
+    _seed(path, with_display=True)
+    ble = _LinkNeverUpBLE()
+    rt, statuses = _runtime(path, ble)
+    for t in (0.0, 1.0, 2.0):
+        rt._monitor_tick(t)  # must not raise
+    assert "connected" not in [s for _, s in statuses]
+
+
 def test_monitor_start_stop_lifecycle(tmp_path: Path) -> None:
     path = tmp_path / "rt.db"
     _seed(path)
