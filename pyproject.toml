@@ -57,6 +57,6 @@ ignore_missing_imports = true
 # and decorators resolve to Any. Relax the two strict checks that only fire for
 # that reason in the modules that subclass / decorate with those APIs.
 [[tool.mypy.overrides]]
-module = ["home_server.web.*", "home_server.ble.bluepy_manager"]
+module = ["home_server.web.*", "home_server.ble.bluepy_manager", "home_server.ble.bluepy_worker"]
 disallow_subclassing_any = false
 disallow_untyped_decorators = false

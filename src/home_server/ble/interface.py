@@ -35,7 +35,13 @@ class BLEManager(Protocol):
         ...
 
     def connect(self, address: str, addr_type: str = "public") -> ConnectionHandle:
-        """Establish a GATT connection. Raises if the peer is unreachable."""
+        """Begin/ensure a GATT connection and return the handle.
+
+        A newly created connection is awaited up to the manager's timeout
+        (raising on failure); a connection already being managed returns
+        immediately, so the link may not be up yet — ``is_connected()`` is the
+        authoritative check.
+        """
         ...
 
     def disconnect(self, handle: ConnectionHandle) -> None: ...
