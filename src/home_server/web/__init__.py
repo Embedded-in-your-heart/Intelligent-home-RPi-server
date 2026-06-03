@@ -75,7 +75,7 @@ def create_app(config: Config, ble: BLEManager | None = None) -> Flask:
         ble = MockBLEManager()
     limiter = RateLimiter(config.reading_min_interval)
     channel_service = ChannelService(ble, limiter, _emit_reading)
-    device_service = DeviceService(ble)
+    device_service = DeviceService(ble, scan_name_prefix=config.scan_name_prefix)
     app.extensions[DEVICE_SERVICE_KEY] = device_service
     app.extensions[CHANNEL_SERVICE_KEY] = channel_service
     app.extensions[BLE_RUNTIME_KEY] = BleRuntime(
