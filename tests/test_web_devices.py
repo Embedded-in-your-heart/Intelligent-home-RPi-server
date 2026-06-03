@@ -192,3 +192,61 @@ def test_scan_requires_login(client: FlaskClient) -> None:
     resp = client.get("/devices/scan")
     assert resp.status_code == 302
     assert "/auth/login" in resp.headers["Location"]
+
+
+def test_add_device_stores_addr_type_from_form(
+    app: Flask, logged_in_client: FlaskClient
+) -> None:
+    token = _csrf_token(logged_in_client, "/devices")
+    logged_in_client.post(
+        "/devices",
+        data={
+            "address": "f6:8c:f2:d3:ea:e7",
+            "name": "STM",
+            "addr_type": "random",
+            "csrf_token": token,
+        },
+        follow_redirects=True,
+    )
+    conn = connection.connect(app.config["DB_PATH"])
+    try:
+        device = devices.get_by_address(conn, "f6:8c:f2:d3:ea:e7")
+    finally:
+        conn.close()
+    assert device is not None
+    assert device.addr_type == "random"
+
+
+def test_add_device_without_addr_type_infers(
+    app: Flask, logged_in_client: FlaskClient
+) -> None:
+    token = _csrf_token(logged_in_client, "/devices")
+    logged_in_client.post(
+        "/devices",
+        data={
+            "address": "f6:8c:f2:d3:ea:e7",
+            "name": "STM",
+            "csrf_token": token,
+        },
+        follow_redirects=True,
+    )
+    conn = connection.connect(app.config["DB_PATH"])
+    try:
+        device = devices.get_by_address(conn, "f6:8c:f2:d3:ea:e7")
+    finally:
+        conn.close()
+    assert device is not None
+    assert device.addr_type == "random"
+
+
+def test_scan_results_include_addr_type_hidden_input(
+    logged_in_client: FlaskClient, mock_ble
+) -> None:
+    mock_ble.scan_results = [
+        DiscoveredDevice(
+            address="f6:8c:f2:d3:ea:e7", name="HOME-N", rssi=-40, addr_type="random"
+        )
+    ]
+    body = logged_in_client.get("/devices/scan").get_data(as_text=True)
+    assert 'name="addr_type"' in body
+    assert 'value="random"' in body

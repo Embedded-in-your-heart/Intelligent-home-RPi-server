@@ -6,7 +6,7 @@ from flask import Blueprint, abort, current_app, flash, redirect, render_templat
 from flask_login import current_user, login_required
 from flask_wtf import FlaskForm
 from werkzeug.wrappers import Response
-from wtforms import StringField
+from wtforms import HiddenField, StringField
 from wtforms.validators import DataRequired
 
 from home_server.ble import parser
@@ -22,6 +22,7 @@ bp = Blueprint("devices", __name__)
 class AddDeviceForm(FlaskForm):
     address = StringField("Address", validators=[DataRequired()])
     name = StringField("Name", validators=[DataRequired()])
+    addr_type = HiddenField("Addr type")
 
 
 @bp.route("/devices", methods=["GET", "POST"])
@@ -35,6 +36,7 @@ def list_devices() -> Response | str:
                 owner_user_id=int(current_user.get_id()),
                 address=form.address.data,
                 name=form.name.data,
+                addr_type=form.addr_type.data or None,
             )
         except InvalidAddressError:
             flash("Invalid BLE address")
