@@ -18,6 +18,7 @@ class DeviceNotFoundError(LookupError):
 class Device:
     id: int
     address: str
+    addr_type: str
     name: str
     owner_user_id: int
     created_at: str
@@ -27,6 +28,7 @@ class Device:
         return cls(
             id=row["id"],
             address=row["address"],
+            addr_type=row["addr_type"],
             name=row["name"],
             owner_user_id=row["owner_user_id"],
             created_at=row["created_at"],
@@ -39,11 +41,13 @@ def create(
     address: str,
     name: str,
     owner_user_id: int,
+    addr_type: str = "public",
 ) -> int:
     try:
         cur = conn.execute(
-            "INSERT INTO devices (address, name, owner_user_id) VALUES (?, ?, ?)",
-            (address, name, owner_user_id),
+            "INSERT INTO devices (address, name, owner_user_id, addr_type) "
+            "VALUES (?, ?, ?, ?)",
+            (address, name, owner_user_id, addr_type),
         )
     except sqlite3.IntegrityError as e:
         msg = str(e).upper()

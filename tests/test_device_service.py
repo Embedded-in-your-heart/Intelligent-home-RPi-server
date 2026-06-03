@@ -15,11 +15,25 @@ def owner(db_conn) -> int:
 
 
 def test_scan_returns_devices(db_conn) -> None:
-    mock = MockBLEManager(scan_results=[DiscoveredDevice(ADDR, "STM32", -50)])
+    mock = MockBLEManager(scan_results=[DiscoveredDevice(ADDR, "HOME-STM32", -50)])
     svc = DeviceService(mock)
     found = svc.scan(5.0)
-    assert found == [DiscoveredDevice(ADDR, "STM32", -50)]
+    assert found == [DiscoveredDevice(ADDR, "HOME-STM32", -50)]
     assert mock.scan_calls == [5.0]
+
+
+def test_scan_filters_out_non_home_and_unnamed(db_conn) -> None:
+    mock = MockBLEManager(
+        scan_results=[
+            DiscoveredDevice("AA:BB:CC:DD:EE:01", "HOME-Light", -40),
+            DiscoveredDevice("AA:BB:CC:DD:EE:02", "Other", -50),
+            DiscoveredDevice("AA:BB:CC:DD:EE:03", None, -60),
+            DiscoveredDevice("AA:BB:CC:DD:EE:04", "home-light", -70),  # case-sensitive
+        ]
+    )
+    svc = DeviceService(mock)
+    found = svc.scan(5.0)
+    assert [d.name for d in found] == ["HOME-Light"]
 
 
 def test_add_device_persists_and_connects(db_conn, owner) -> None:
@@ -90,3 +104,46 @@ def test_is_connected_reflects_ble() -> None:
     assert svc.is_connected(ADDR) is False
     mock.connect(ADDR)
     assert svc.is_connected(ADDR) is True
+
+
+RANDOM_ADDR = "f6:8c:f2:d3:ea:e7"
+
+
+def test_add_device_infers_random_addr_type(db_conn, owner) -> None:
+    mock = MockBLEManager()
+    svc = DeviceService(mock)
+    d = svc.add_device(
+        db_conn, owner_user_id=owner, address=RANDOM_ADDR, name="stm"
+    )
+    assert d.addr_type == "random"
+    assert mock.connect_calls == [(RANDOM_ADDR, "random")]
+
+
+def test_add_device_uses_explicit_addr_type(db_conn, owner) -> None:
+    mock = MockBLEManager()
+    svc = DeviceService(mock)
+    d = svc.add_device(
+        db_conn,
+        owner_user_id=owner,
+        address=RANDOM_ADDR,
+        name="stm",
+        addr_type="public",
+    )
+    assert d.addr_type == "public"
+    assert mock.connect_calls == [(RANDOM_ADDR, "public")]
+
+
+def test_add_device_coerces_invalid_addr_type_to_inference(db_conn, owner) -> None:
+    # A tampered request could supply a value outside the CHECK allowlist; it
+    # must be coerced (here: inferred -> "random") rather than raising on insert.
+    mock = MockBLEManager()
+    svc = DeviceService(mock)
+    d = svc.add_device(
+        db_conn,
+        owner_user_id=owner,
+        address=RANDOM_ADDR,
+        name="stm",
+        addr_type="garbage",
+    )
+    assert d.addr_type == "random"
+    assert mock.connect_calls == [(RANDOM_ADDR, "random")]

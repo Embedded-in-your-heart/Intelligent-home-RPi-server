@@ -11,6 +11,7 @@ import logging
 import re
 import sqlite3
 
+from home_server.ble.address import ADDR_TYPE_PUBLIC, ADDR_TYPE_RANDOM, infer_addr_type
 from home_server.ble.interface import BLEManager, DiscoveredDevice
 from home_server.db import devices
 from home_server.db.devices import Device, DeviceNotFoundError
@@ -24,13 +25,21 @@ class InvalidAddressError(ValueError):
 
 _MAC_RE = re.compile(r"^([0-9A-Fa-f]{2}:){5}[0-9A-Fa-f]{2}$")
 
+# Only devices advertising a name with this prefix are surfaced by scan.
+_REQUIRED_NAME_PREFIX = "HOME-"
+
 
 class DeviceService:
     def __init__(self, ble: BLEManager) -> None:
         self._ble = ble
 
     def scan(self, duration_s: float) -> list[DiscoveredDevice]:
-        return self._ble.start_scan(duration_s)
+        found = self._ble.start_scan(duration_s)
+        return [
+            d
+            for d in found
+            if d.name is not None and d.name.startswith(_REQUIRED_NAME_PREFIX)
+        ]
 
     def add_device(
         self,
@@ -39,15 +48,27 @@ class DeviceService:
         owner_user_id: int,
         address: str,
         name: str,
+        addr_type: str | None = None,
     ) -> Device:
         if not _MAC_RE.match(address):
             raise InvalidAddressError(f"invalid BLE address: {address!r}")
+        # Honour an explicit, valid addr_type; otherwise infer from the address.
+        # Coercing unknown values (only reachable via a tampered request) avoids
+        # an uncaught CHECK-constraint IntegrityError on insert.
+        if addr_type in (ADDR_TYPE_PUBLIC, ADDR_TYPE_RANDOM):
+            resolved_addr_type = addr_type
+        else:
+            resolved_addr_type = infer_addr_type(address)
         device_id = devices.create(
-            conn, address=address, name=name, owner_user_id=owner_user_id
+            conn,
+            address=address,
+            name=name,
+            owner_user_id=owner_user_id,
+            addr_type=resolved_addr_type,
         )
         # Best-effort initial connect; keep the device on failure for later retry.
         try:
-            self._ble.connect(address)
+            self._ble.connect(address, resolved_addr_type)
         except Exception:
             log.warning(
                 "Initial connect to %s failed; device kept for later retry",

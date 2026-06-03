@@ -87,7 +87,7 @@ class BleRuntime:
     def _bring_up_device(self, conn: sqlite3.Connection, device: Device) -> bool:
         """Connect one device and subscribe its display channels. Returns success."""
         try:
-            self._ble.connect(device.address)
+            self._ble.connect(device.address, device.addr_type)
         except Exception:
             log.warning("connect to %s failed", device.address, exc_info=True)
             return False

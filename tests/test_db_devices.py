@@ -64,3 +64,25 @@ def test_cascade_on_user_delete(db_conn, alice_id) -> None:
     devices.create(db_conn, address="aa", name="d", owner_user_id=alice_id)
     db_conn.execute("DELETE FROM users WHERE id = ?", (alice_id,))
     assert devices.list_all(db_conn) == []
+
+
+def test_create_stores_addr_type(db_conn, alice_id) -> None:
+    did = devices.create(
+        db_conn,
+        address="f6:8c:f2:d3:ea:e7",
+        name="stm",
+        owner_user_id=alice_id,
+        addr_type="random",
+    )
+    d = devices.get_by_id(db_conn, did)
+    assert d is not None
+    assert d.addr_type == "random"
+
+
+def test_create_defaults_addr_type_public(db_conn, alice_id) -> None:
+    did = devices.create(
+        db_conn, address="aa:bb", name="d", owner_user_id=alice_id
+    )
+    d = devices.get_by_id(db_conn, did)
+    assert d is not None
+    assert d.addr_type == "public"

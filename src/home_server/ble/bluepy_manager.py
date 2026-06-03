@@ -20,6 +20,7 @@ from concurrent.futures import Future
 from dataclasses import dataclass
 from typing import Any
 
+from .address import infer_addr_type
 from .interface import ConnectionHandle, DiscoveredDevice, NotifyCallback
 
 if sys.platform != "linux":
@@ -73,9 +74,10 @@ class _NotifyDelegate(btle.DefaultDelegate):
 
 
 class _PeripheralWorker(threading.Thread):
-    def __init__(self, address: str) -> None:
+    def __init__(self, address: str, addr_type: str = "public") -> None:
         super().__init__(name=f"ble-worker-{address}", daemon=True)
         self.address = address
+        self._addr_type = addr_type
         self._queue: queue.Queue[_Cmd] = queue.Queue()
         self._peripheral: btle.Peripheral | None = None
         self._delegate = _NotifyDelegate()
@@ -107,7 +109,7 @@ class _PeripheralWorker(threading.Thread):
 
     def run(self) -> None:
         try:
-            self._peripheral = btle.Peripheral(self.address, addrType=btle.ADDR_TYPE_PUBLIC)
+            self._peripheral = btle.Peripheral(self.address, addrType=self._addr_type)
             self._peripheral.withDelegate(self._delegate)
             self._connected.set()
             self._connect_future.set_result(None)
@@ -241,15 +243,22 @@ class BluepyManager:
         for e in entries:
             # ScanEntry.getValueText(9) = Complete Local Name (AD type 0x09).
             name = e.getValueText(9) or e.getValueText(8)
-            out.append(DiscoveredDevice(address=e.addr, name=name, rssi=e.rssi))
+            out.append(
+                DiscoveredDevice(
+                    address=e.addr,
+                    name=name,
+                    rssi=e.rssi,
+                    addr_type=e.addrType or infer_addr_type(e.addr),
+                )
+            )
         return out
 
-    def connect(self, address: str) -> ConnectionHandle:
+    def connect(self, address: str, addr_type: str = "public") -> ConnectionHandle:
         with self._lock:
             existing = self._workers.get(address)
             if existing is not None and existing.is_alive():
                 return address
-            worker = _PeripheralWorker(address)
+            worker = _PeripheralWorker(address, addr_type)
             worker.start()
             self._workers[address] = worker
         worker.wait_until_connected(timeout=self._op_timeout_s)

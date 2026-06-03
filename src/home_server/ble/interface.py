@@ -19,6 +19,7 @@ class DiscoveredDevice:
     address: str
     name: str | None
     rssi: int
+    addr_type: str = "public"
 
 
 # ConnectionHandle is just the device address — the manager keeps the
@@ -33,7 +34,7 @@ class BLEManager(Protocol):
         """Block for ``duration_s`` and return all advertising devices seen."""
         ...
 
-    def connect(self, address: str) -> ConnectionHandle:
+    def connect(self, address: str, addr_type: str = "public") -> ConnectionHandle:
         """Establish a GATT connection. Raises if the peer is unreachable."""
         ...
 

@@ -87,3 +87,11 @@ def test_make_feed_encodes_known_channel_and_skips_unknown(db_path: Path) -> Non
     assert data is not None
     assert 0 <= parser.decode(data, "uint8") <= 255
     assert feed("ZZ:ZZ", "nope") is None
+
+
+def test_activate_connects_with_device_addr_type(db_path: Path) -> None:
+    ble = MockBLEManager()
+    rt, _ = _runtime(db_path, ble)
+    rt.activate()
+    # db_path fixture created the device without addr_type -> defaults public.
+    assert ble.connect_calls == [(ADDR, "public")]

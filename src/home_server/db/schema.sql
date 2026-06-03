@@ -13,6 +13,7 @@ CREATE TABLE IF NOT EXISTS devices (
     address        TEXT NOT NULL UNIQUE,
     name           TEXT NOT NULL,
     owner_user_id  INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    addr_type      TEXT NOT NULL DEFAULT 'public' CHECK (addr_type IN ('public', 'random')),
     created_at     TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 
