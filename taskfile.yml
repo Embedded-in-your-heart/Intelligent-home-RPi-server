@@ -17,7 +17,7 @@ tasks:
   run:
     desc: Start the dev server (loads .env)
     cmds:
-      - uv run python -m home_server
+      - sudo -E .venv/bin/python3.12 -m home_server
 
   test:
     desc: Run pytest
