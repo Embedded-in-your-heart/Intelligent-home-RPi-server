@@ -91,6 +91,14 @@ class BleRuntime:
         except Exception:
             log.warning("connect to %s failed", device.address, exc_info=True)
             return False
+        # connect() can return without raising while the link is not yet up
+        # (the manager may reuse a worker whose connect attempt is still in
+        # flight — exactly what a powered-off device produces). is_connected()
+        # is the single source of truth: only proceed once it confirms the
+        # link, otherwise report failure so the monitor keeps retrying instead
+        # of flapping to "connected" and subscribing on a dead link.
+        if not self._ble.is_connected(device.address):
+            return False
         for channel in channels.list_by_device(conn, device.id):
             if channel.type == "display":
                 self.subscribe_channel(device.address, channel)
