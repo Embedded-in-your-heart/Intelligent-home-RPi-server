@@ -35,6 +35,7 @@ class MockBLEManager:
     _connected: set[str] = field(default_factory=set)
     _subscriptions: dict[tuple[str, str], NotifyCallback] = field(default_factory=dict)
     scan_calls: list[float] = field(default_factory=list)
+    connect_calls: list[tuple[str, str]] = field(default_factory=list)
 
     # Dev-only synthetic producer (see start()/stop()). Not part of equality.
     _producer_thread: threading.Thread | None = field(
@@ -50,7 +51,10 @@ class MockBLEManager:
         self.scan_calls.append(duration_s)
         return list(self.scan_results)
 
-    def connect(self, address: str) -> ConnectionHandle:
+    def connect(
+        self, address: str, addr_type: str = "public"
+    ) -> ConnectionHandle:
+        self.connect_calls.append((address, addr_type))
         if address in self.fail_connect_for:
             raise MockBLEError(f"Mocked connect failure for {address}")
         self._connected.add(address)

@@ -144,3 +144,16 @@ def test_start_then_stop_emits_and_terminates() -> None:
     assert len(received) >= 1
     assert mgr._producer_thread is None
     assert thread is not None and not thread.is_alive()
+
+
+def test_connect_records_address_and_addr_type() -> None:
+    mock = MockBLEManager()
+    mock.connect("f6:8c:f2:d3:ea:e7", "random")
+    assert mock.connect_calls == [("f6:8c:f2:d3:ea:e7", "random")]
+    assert mock.is_connected("f6:8c:f2:d3:ea:e7")
+
+
+def test_connect_defaults_addr_type_public() -> None:
+    mock = MockBLEManager()
+    mock.connect("aa:bb:cc:dd:ee:ff")
+    assert mock.connect_calls == [("aa:bb:cc:dd:ee:ff", "public")]

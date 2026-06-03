@@ -244,7 +244,7 @@ class BluepyManager:
             out.append(DiscoveredDevice(address=e.addr, name=name, rssi=e.rssi))
         return out
 
-    def connect(self, address: str) -> ConnectionHandle:
+    def connect(self, address: str, addr_type: str = "public") -> ConnectionHandle:
         with self._lock:
             existing = self._workers.get(address)
             if existing is not None and existing.is_alive():
