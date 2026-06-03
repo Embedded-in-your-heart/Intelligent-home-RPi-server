@@ -25,13 +25,21 @@ class InvalidAddressError(ValueError):
 
 _MAC_RE = re.compile(r"^([0-9A-Fa-f]{2}:){5}[0-9A-Fa-f]{2}$")
 
+# Only devices advertising a name with this prefix are surfaced by scan.
+_REQUIRED_NAME_PREFIX = "HOME-"
+
 
 class DeviceService:
     def __init__(self, ble: BLEManager) -> None:
         self._ble = ble
 
     def scan(self, duration_s: float) -> list[DiscoveredDevice]:
-        return self._ble.start_scan(duration_s)
+        found = self._ble.start_scan(duration_s)
+        return [
+            d
+            for d in found
+            if d.name is not None and d.name.startswith(_REQUIRED_NAME_PREFIX)
+        ]
 
     def add_device(
         self,

@@ -15,11 +15,25 @@ def owner(db_conn) -> int:
 
 
 def test_scan_returns_devices(db_conn) -> None:
-    mock = MockBLEManager(scan_results=[DiscoveredDevice(ADDR, "STM32", -50)])
+    mock = MockBLEManager(scan_results=[DiscoveredDevice(ADDR, "HOME-STM32", -50)])
     svc = DeviceService(mock)
     found = svc.scan(5.0)
-    assert found == [DiscoveredDevice(ADDR, "STM32", -50)]
+    assert found == [DiscoveredDevice(ADDR, "HOME-STM32", -50)]
     assert mock.scan_calls == [5.0]
+
+
+def test_scan_filters_out_non_home_and_unnamed(db_conn) -> None:
+    mock = MockBLEManager(
+        scan_results=[
+            DiscoveredDevice("AA:BB:CC:DD:EE:01", "HOME-Light", -40),
+            DiscoveredDevice("AA:BB:CC:DD:EE:02", "Other", -50),
+            DiscoveredDevice("AA:BB:CC:DD:EE:03", None, -60),
+            DiscoveredDevice("AA:BB:CC:DD:EE:04", "home-light", -70),  # case-sensitive
+        ]
+    )
+    svc = DeviceService(mock)
+    found = svc.scan(5.0)
+    assert [d.name for d in found] == ["HOME-Light"]
 
 
 def test_add_device_persists_and_connects(db_conn, owner) -> None:
