@@ -90,3 +90,30 @@ def test_is_connected_reflects_ble() -> None:
     assert svc.is_connected(ADDR) is False
     mock.connect(ADDR)
     assert svc.is_connected(ADDR) is True
+
+
+RANDOM_ADDR = "f6:8c:f2:d3:ea:e7"
+
+
+def test_add_device_infers_random_addr_type(db_conn, owner) -> None:
+    mock = MockBLEManager()
+    svc = DeviceService(mock)
+    d = svc.add_device(
+        db_conn, owner_user_id=owner, address=RANDOM_ADDR, name="stm"
+    )
+    assert d.addr_type == "random"
+    assert mock.connect_calls == [(RANDOM_ADDR, "random")]
+
+
+def test_add_device_uses_explicit_addr_type(db_conn, owner) -> None:
+    mock = MockBLEManager()
+    svc = DeviceService(mock)
+    d = svc.add_device(
+        db_conn,
+        owner_user_id=owner,
+        address=RANDOM_ADDR,
+        name="stm",
+        addr_type="public",
+    )
+    assert d.addr_type == "public"
+    assert mock.connect_calls == [(RANDOM_ADDR, "public")]

@@ -11,6 +11,7 @@ import logging
 import re
 import sqlite3
 
+from home_server.ble.address import infer_addr_type
 from home_server.ble.interface import BLEManager, DiscoveredDevice
 from home_server.db import devices
 from home_server.db.devices import Device, DeviceNotFoundError
@@ -39,15 +40,21 @@ class DeviceService:
         owner_user_id: int,
         address: str,
         name: str,
+        addr_type: str | None = None,
     ) -> Device:
         if not _MAC_RE.match(address):
             raise InvalidAddressError(f"invalid BLE address: {address!r}")
+        resolved_addr_type = addr_type or infer_addr_type(address)
         device_id = devices.create(
-            conn, address=address, name=name, owner_user_id=owner_user_id
+            conn,
+            address=address,
+            name=name,
+            owner_user_id=owner_user_id,
+            addr_type=resolved_addr_type,
         )
         # Best-effort initial connect; keep the device on failure for later retry.
         try:
-            self._ble.connect(address)
+            self._ble.connect(address, resolved_addr_type)
         except Exception:
             log.warning(
                 "Initial connect to %s failed; device kept for later retry",
