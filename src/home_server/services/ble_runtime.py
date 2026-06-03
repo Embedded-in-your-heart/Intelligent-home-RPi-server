@@ -49,6 +49,9 @@ class _DeviceMonitorState:
     last_status: str | None = None
     backoff_s: float = _RECONNECT_BASE_S
     next_retry_at: float = 0.0
+    # Whether display channels are subscribed for the current connection. Reset
+    # on every observed drop so the next connect re-subscribes.
+    subscribed: bool = False
 
 
 class BleRuntime:
@@ -75,32 +78,42 @@ class BleRuntime:
     # ---- Initial bring-up ----
 
     def activate(self) -> None:
-        """Connect every known device and subscribe its display channels."""
+        """Connect every known device and subscribe its display channels.
+
+        Synchronous one-shot bring-up at startup. Devices brought up here seed
+        the monitor with ``subscribed=True`` so its first tick reports them
+        connected without re-subscribing; failures are left for the monitor to
+        retry over the non-blocking reconnect path.
+        """
         conn = self._conn_factory()
         try:
             for device in devices.list_all(conn):
-                self._bring_up_device(conn, device)
+                if self._bring_up_device(conn, device):
+                    self._monitor[device.address] = _DeviceMonitorState(subscribed=True)
         finally:
             conn.close()
 
     def _bring_up_device(self, conn: sqlite3.Connection, device: Device) -> bool:
-        """Connect one device and subscribe its display channels. Returns success."""
+        """Connect one device (blocking) and subscribe its display channels.
+        Returns whether the link came up."""
         try:
             self._ble.connect(device.address, device.addr_type)
         except Exception:
             log.warning("connect to %s failed", device.address, exc_info=True)
             return False
-        # Per the BLEManager.connect contract, a reused in-flight connection
-        # returns immediately without guaranteeing the link is up, so
-        # is_connected() is the authoritative check: only proceed once it
-        # confirms the link. Otherwise a powered-off device flaps to
-        # "connected" and we subscribe on a dead link.
+        # connect() blocks until linked or raises, but is_connected() stays the
+        # authoritative guard against subscribing on a half-open link.
         if not self._ble.is_connected(device.address):
             return False
+        self._subscribe_display_channels(conn, device)
+        return True
+
+    def _subscribe_display_channels(
+        self, conn: sqlite3.Connection, device: Device
+    ) -> None:
         for channel in channels.list_by_device(conn, device.id):
             if channel.type == "display":
                 self.subscribe_channel(device.address, channel)
-        return True
 
     def subscribe_channel(self, address: str, channel: Channel) -> None:
         """Subscribe one display channel; each notify opens a short-lived conn."""
@@ -148,10 +161,10 @@ class BleRuntime:
             for device in device_list:
                 state = self._monitor.setdefault(device.address, _DeviceMonitorState())
                 if self._ble.is_connected(device.address):
-                    state.backoff_s = _RECONNECT_BASE_S
-                    state.next_retry_at = 0.0
-                    self._set_status(device.id, state, STATUS_CONNECTED)
+                    self._on_connected(conn, device, state)
                     continue
+                # Link is down: the next connect must re-subscribe.
+                state.subscribed = False
                 if state.last_status in (None, STATUS_CONNECTED):
                     # Just observed a drop: announce it, schedule first retry.
                     state.backoff_s = _RECONNECT_BASE_S
@@ -160,10 +173,12 @@ class BleRuntime:
                     continue
                 if now >= state.next_retry_at:
                     self._set_status(device.id, state, STATUS_RECONNECTING)
-                    if self._bring_up_device(conn, device):
-                        state.backoff_s = _RECONNECT_BASE_S
-                        state.next_retry_at = 0.0
-                        self._set_status(device.id, state, STATUS_CONNECTED)
+                    # Non-blocking: kick the attempt and re-check. A synchronous
+                    # backend links up within this tick; an async one (bluepy)
+                    # links up on a later tick, where the branch above subscribes.
+                    self._ble.ensure_connecting(device.address, device.addr_type)
+                    if self._ble.is_connected(device.address):
+                        self._on_connected(conn, device, state)
                     else:
                         state.backoff_s = min(
                             state.backoff_s * _RECONNECT_FACTOR, _RECONNECT_CAP_S
@@ -171,6 +186,18 @@ class BleRuntime:
                         state.next_retry_at = now + state.backoff_s
         finally:
             conn.close()
+
+    def _on_connected(
+        self, conn: sqlite3.Connection, device: Device, state: _DeviceMonitorState
+    ) -> None:
+        """A device is (or just became) connected: subscribe its display
+        channels once per connection, reset backoff, report connected."""
+        if not state.subscribed:
+            self._subscribe_display_channels(conn, device)
+            state.subscribed = True
+        state.backoff_s = _RECONNECT_BASE_S
+        state.next_retry_at = 0.0
+        self._set_status(device.id, state, STATUS_CONNECTED)
 
     def _set_status(
         self, device_id: int, state: _DeviceMonitorState, status: str

@@ -35,12 +35,19 @@ class BLEManager(Protocol):
         ...
 
     def connect(self, address: str, addr_type: str = "public") -> ConnectionHandle:
-        """Begin/ensure a GATT connection and return the handle.
+        """Establish a GATT connection, blocking until the link is up.
 
-        A newly created connection is awaited up to the manager's timeout
-        (raising on failure); a connection already being managed returns
-        immediately, so the link may not be up yet — ``is_connected()`` is the
-        authoritative check.
+        Raises ``ConnectionError`` if the peer can't be reached within the
+        manager's timeout. Use this for one-shot connects (adding a device,
+        initial bring-up); the reconnect monitor uses ``ensure_connecting``.
+        """
+        ...
+
+    def ensure_connecting(self, address: str, addr_type: str = "public") -> None:
+        """Ensure a connection attempt is underway, without blocking.
+
+        Returns immediately; poll ``is_connected()`` for the result. Used by
+        the reconnect monitor so a slow/unreachable peer never stalls it.
         """
         ...
 

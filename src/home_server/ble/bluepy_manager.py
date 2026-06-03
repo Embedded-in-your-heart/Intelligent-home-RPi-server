@@ -50,13 +50,17 @@ class BluepyManager:
         return out
 
     def connect(self, address: str, addr_type: str = "public") -> ConnectionHandle:
-        worker, created = self._ensure_worker(address, addr_type)
-        if created:
-            # A new worker is awaited so callers (e.g. activate()) can subscribe
-            # once connected. A reused worker returns immediately — the caller
-            # polls is_connected() for the authoritative link state.
-            worker.wait_until_connected(timeout=self._op_timeout_s)
+        worker = self._ensure_worker(address, addr_type)
+        # Block until the link is up (or raise on failure/timeout) so callers
+        # like activate() can subscribe immediately afterwards.
+        worker.wait_until_connected(timeout=self._op_timeout_s)
         return address
+
+    def ensure_connecting(self, address: str, addr_type: str = "public") -> None:
+        # Non-blocking: spin up (or reuse) the worker and return at once. The
+        # reconnect monitor polls is_connected() instead of waiting here, so a
+        # slow/unreachable peer never stalls it.
+        self._ensure_worker(address, addr_type)
 
     def disconnect(self, handle: ConnectionHandle) -> None:
         with self._lock:
@@ -96,19 +100,17 @@ class BluepyManager:
 
     # ---- Internal ----
 
-    def _ensure_worker(
-        self, address: str, addr_type: str
-    ) -> tuple[_PeripheralWorker, bool]:
-        """Return the live worker for ``address`` (creating+starting one if
-        none is alive). The bool is True when a new worker was created."""
+    def _ensure_worker(self, address: str, addr_type: str) -> _PeripheralWorker:
+        """Return the live worker for ``address``, creating+starting one if
+        none is currently alive."""
         with self._lock:
             existing = self._workers.get(address)
             if existing is not None and existing.is_alive():
-                return existing, False
+                return existing
             worker = _PeripheralWorker(address, addr_type)
             worker.start()
             self._workers[address] = worker
-            return worker, True
+            return worker
 
     def _require_worker(self, handle: ConnectionHandle) -> _PeripheralWorker:
         with self._lock:

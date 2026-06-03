@@ -56,6 +56,15 @@ class MockBLEManager:
         self._connected.add(address)
         return address
 
+    def ensure_connecting(self, address: str, addr_type: str = "public") -> None:
+        # Non-blocking analogue of connect(): records the attempt and links up
+        # synchronously, except for fail_connect_for addresses which stay down
+        # (modelling a peer whose link never comes up). Never raises.
+        self.connect_calls.append((address, addr_type))
+        if address in self.fail_connect_for:
+            return
+        self._connected.add(address)
+
     def disconnect(self, handle: ConnectionHandle) -> None:
         self._connected.discard(handle)
         # Drop subscriptions tied to this handle.

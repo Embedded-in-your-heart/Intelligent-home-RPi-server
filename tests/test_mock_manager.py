@@ -156,3 +156,16 @@ def test_connect_defaults_addr_type_public() -> None:
     mock = MockBLEManager()
     mock.connect("aa:bb:cc:dd:ee:ff")
     assert mock.connect_calls == [("aa:bb:cc:dd:ee:ff", "public")]
+
+
+def test_ensure_connecting_links_up_without_blocking() -> None:
+    mgr = MockBLEManager()
+    mgr.ensure_connecting("aa:bb", "random")
+    assert mgr.is_connected("aa:bb")
+    assert mgr.connect_calls == [("aa:bb", "random")]
+
+
+def test_ensure_connecting_respects_fail_connect_for() -> None:
+    mgr = MockBLEManager(fail_connect_for={"aa:bb"})
+    mgr.ensure_connecting("aa:bb")  # never raises
+    assert not mgr.is_connected("aa:bb")
