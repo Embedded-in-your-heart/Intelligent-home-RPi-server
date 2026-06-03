@@ -10,9 +10,10 @@ Test code arranges:
 
 from __future__ import annotations
 
-import threading
 from collections.abc import Callable
 from dataclasses import dataclass, field
+
+from home_server.core.periodic import PeriodicWorker
 
 from .interface import ConnectionHandle, DiscoveredDevice, NotifyCallback
 
@@ -38,12 +39,7 @@ class MockBLEManager:
     connect_calls: list[tuple[str, str]] = field(default_factory=list)
 
     # Dev-only synthetic producer (see start()/stop()). Not part of equality.
-    _producer_thread: threading.Thread | None = field(
-        default=None, compare=False, repr=False
-    )
-    _producer_stop: threading.Event | None = field(
-        default=None, compare=False, repr=False
-    )
+    _producer: PeriodicWorker | None = field(default=None, compare=False, repr=False)
 
     # ---- BLEManager protocol ----
 
@@ -109,26 +105,19 @@ class MockBLEManager:
         skip that subscription this tick. Dev/demo use only — tests drive
         notifications synchronously via simulate_notify().
         """
-        if self._producer_thread is not None:
+        if self._producer is not None:
             return
-        stop = threading.Event()
-
-        def _run() -> None:
-            while not stop.wait(interval_s):
-                self._tick(feed)
-
-        thread = threading.Thread(target=_run, name="mock-ble-producer", daemon=True)
-        self._producer_stop = stop
-        self._producer_thread = thread
-        thread.start()
+        self._producer = PeriodicWorker(
+            lambda: self._tick(feed),
+            interval_s=interval_s,
+            name="mock-ble-producer",
+        )
+        self._producer.start()
 
     def stop(self) -> None:
-        if self._producer_stop is not None:
-            self._producer_stop.set()
-        if self._producer_thread is not None:
-            self._producer_thread.join(timeout=2.0)
-        self._producer_thread = None
-        self._producer_stop = None
+        if self._producer is not None:
+            self._producer.stop()
+            self._producer = None
 
     def _tick(self, feed: Callable[[str, str], bytes | None]) -> None:
         for (address, char_uuid), callback in list(self._subscriptions.items()):

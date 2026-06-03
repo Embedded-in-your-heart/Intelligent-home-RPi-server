@@ -14,13 +14,13 @@ from __future__ import annotations
 import logging
 import math
 import sqlite3
-import threading
 import time
 from collections.abc import Callable
 from dataclasses import dataclass
 
 from home_server.ble import parser
 from home_server.ble.interface import BLEManager
+from home_server.core.periodic import PeriodicWorker
 from home_server.db import channels, devices
 from home_server.db.channels import Channel
 from home_server.db.devices import Device
@@ -70,8 +70,7 @@ class BleRuntime:
         self._subscribed: dict[tuple[str, str], Channel] = {}
         # address -> reconnect bookkeeping.
         self._monitor: dict[str, _DeviceMonitorState] = {}
-        self._monitor_thread: threading.Thread | None = None
-        self._monitor_stop: threading.Event | None = None
+        self._monitor_worker: PeriodicWorker | None = None
 
     # ---- Initial bring-up ----
 
@@ -91,12 +90,11 @@ class BleRuntime:
         except Exception:
             log.warning("connect to %s failed", device.address, exc_info=True)
             return False
-        # connect() can return without raising while the link is not yet up
-        # (the manager may reuse a worker whose connect attempt is still in
-        # flight — exactly what a powered-off device produces). is_connected()
-        # is the single source of truth: only proceed once it confirms the
-        # link, otherwise report failure so the monitor keeps retrying instead
-        # of flapping to "connected" and subscribing on a dead link.
+        # Per the BLEManager.connect contract, a reused in-flight connection
+        # returns immediately without guaranteeing the link is up, so
+        # is_connected() is the authoritative check: only proceed once it
+        # confirms the link. Otherwise a powered-off device flaps to
+        # "connected" and we subscribe on a dead link.
         if not self._ble.is_connected(device.address):
             return False
         for channel in channels.list_by_device(conn, device.id):
@@ -124,29 +122,19 @@ class BleRuntime:
 
     def monitor_start(self, interval_s: float = 1.0) -> None:
         """Run the reconnect monitor in a background daemon thread."""
-        if self._monitor_thread is not None:
+        if self._monitor_worker is not None:
             return
-        stop = threading.Event()
-
-        def _run() -> None:
-            while not stop.wait(interval_s):
-                try:
-                    self._monitor_tick(time.monotonic())
-                except Exception:
-                    log.exception("BLE monitor tick failed")
-
-        thread = threading.Thread(target=_run, name="ble-monitor", daemon=True)
-        self._monitor_stop = stop
-        self._monitor_thread = thread
-        thread.start()
+        self._monitor_worker = PeriodicWorker(
+            lambda: self._monitor_tick(time.monotonic()),
+            interval_s=interval_s,
+            name="ble-monitor",
+        )
+        self._monitor_worker.start()
 
     def monitor_stop(self) -> None:
-        if self._monitor_stop is not None:
-            self._monitor_stop.set()
-        if self._monitor_thread is not None:
-            self._monitor_thread.join(timeout=2.0)
-        self._monitor_thread = None
-        self._monitor_stop = None
+        if self._monitor_worker is not None:
+            self._monitor_worker.stop()
+            self._monitor_worker = None
 
     def _monitor_tick(self, now: float) -> None:
         """One reconnect pass. Pure w.r.t. time (caller passes `now`)."""

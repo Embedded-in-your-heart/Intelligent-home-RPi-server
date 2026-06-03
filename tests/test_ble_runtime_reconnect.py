@@ -168,7 +168,6 @@ def test_monitor_start_stop_lifecycle(tmp_path: Path) -> None:
     rt.activate()
     rt.monitor_start(interval_s=0.01)
     time.sleep(0.05)
-    thread = rt._monitor_thread
+    assert rt._monitor_worker is not None and rt._monitor_worker.is_running()
     rt.monitor_stop()
-    assert rt._monitor_thread is None
-    assert thread is not None and not thread.is_alive()
+    assert rt._monitor_worker is None
