@@ -81,7 +81,10 @@ class _PeripheralWorker(threading.Thread):
         self._delegate = _NotifyDelegate()
         self._char_cache: dict[str, btle.Characteristic] = {}
         self._connected = threading.Event()
-        self._stop = threading.Event()
+        # NOTE: must NOT be named ``_stop`` — that shadows threading.Thread._stop(),
+        # which CPython calls internally from is_alive()/join() once the thread has
+        # terminated, raising "TypeError: 'Event' object is not callable".
+        self._stop_event = threading.Event()
         self._connect_future: Future[None] = Future()
 
     # ---- Public (called from facade) ----
@@ -127,7 +130,7 @@ class _PeripheralWorker(threading.Thread):
 
     def _loop(self) -> None:
         assert self._peripheral is not None
-        while not self._stop.is_set():
+        while not self._stop_event.is_set():
             # Process pending commands first.
             try:
                 cmd = self._queue.get_nowait()
@@ -144,7 +147,7 @@ class _PeripheralWorker(threading.Thread):
                 self._peripheral.waitForNotifications(_NOTIFY_POLL_INTERVAL_S)
             except btle.BTLEDisconnectError:
                 log.warning("Peripheral %s disconnected", self.address)
-                self._stop.set()
+                self._stop_event.set()
                 # Fail any remaining queued commands.
                 self._drain_with_error(ConnectionError("peripheral disconnected"))
                 return
@@ -153,7 +156,7 @@ class _PeripheralWorker(threading.Thread):
         assert self._peripheral is not None
         try:
             if cmd.op == "shutdown":
-                self._stop.set()
+                self._stop_event.set()
                 result: Any = None
             elif cmd.op == "read":
                 (char_uuid,) = cmd.args
