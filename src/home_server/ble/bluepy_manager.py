@@ -7,6 +7,7 @@ Reconnect logic lives in the service layer, not here.
 
 from __future__ import annotations
 
+import logging
 import sys
 import threading
 
@@ -18,6 +19,8 @@ if sys.platform != "linux":
     raise ImportError("bluepy_manager is only supported on Linux")
 
 from bluepy import btle  # noqa: E402  (import after platform check)
+
+log = logging.getLogger(__name__)
 
 # --- Public facade ---
 
@@ -33,8 +36,15 @@ class BluepyManager:
     # ---- BLEManager protocol ----
 
     def start_scan(self, duration_s: float) -> list[DiscoveredDevice]:
-        scanner = btle.Scanner()
-        entries = scanner.scan(duration_s)
+        # Even with peripherals disconnected for the scan window, bluepy's
+        # Scanner.stop() (mgmt "scanend") can intermittently observe a stale
+        # disconnect event and raise. Retry once before giving up; the caller
+        # turns a second failure into a recoverable message, not a 500.
+        try:
+            entries = btle.Scanner().scan(duration_s)
+        except btle.BTLEDisconnectError:
+            log.warning("BLE scan interrupted by a disconnect event; retrying once")
+            entries = btle.Scanner().scan(duration_s)
         out: list[DiscoveredDevice] = []
         for e in entries:
             # ScanEntry.getValueText(9) = Complete Local Name (AD type 0x09).

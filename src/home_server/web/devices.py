@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import logging
+
 from flask import Blueprint, abort, current_app, flash, redirect, render_template, url_for
 from flask_login import current_user, login_required
 from flask_wtf import FlaskForm
@@ -14,7 +16,13 @@ from home_server.db import devices
 from home_server.db.devices import DeviceNotFoundError, DuplicateAddressError
 from home_server.services.device_service import InvalidAddressError
 from home_server.web.db import get_conn
-from home_server.web.services import get_channel_service, get_device_service
+from home_server.web.services import (
+    get_ble_runtime,
+    get_channel_service,
+    get_device_service,
+)
+
+log = logging.getLogger(__name__)
 
 bp = Blueprint("devices", __name__)
 
@@ -81,5 +89,15 @@ def delete(device_id: int) -> Response:
 @bp.get("/devices/scan")
 @login_required
 def scan() -> str:
-    found = get_device_service().scan(current_app.config["BLE_SCAN_DURATION"])
+    duration = current_app.config["BLE_SCAN_DURATION"]
+    # bluepy scanning is unreliable while peripherals are connected on the same
+    # adapter; scan_window() drops live links for the scan and reconnects after.
+    # Any residual adapter flakiness must surface as a recoverable message, not
+    # an unhandled 500.
+    try:
+        with get_ble_runtime().scan_window():
+            found = get_device_service().scan(duration)
+    except Exception:
+        log.warning("BLE scan failed", exc_info=True)
+        return render_template("devices/_scan_results.html", found=[], scan_error=True)
     return render_template("devices/_scan_results.html", found=found)

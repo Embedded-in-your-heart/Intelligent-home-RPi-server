@@ -1,4 +1,6 @@
-{% if found %}
+{% if scan_error %}
+<p class="text-danger mb-0">掃描暫時失敗，請稍後再試。</p>
+{% elif found %}
 <ul class="list-group">
   {% for d in found %}
   <li class="list-group-item d-flex justify-content-between align-items-center flex-wrap gap-2">

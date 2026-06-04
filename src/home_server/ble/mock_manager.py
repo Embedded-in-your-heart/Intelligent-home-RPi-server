@@ -26,6 +26,9 @@ class MockBLEError(Exception):
 class MockBLEManager:
     scan_results: list[DiscoveredDevice] = field(default_factory=list)
     fail_connect_for: set[str] = field(default_factory=set)
+    # When set, start_scan() raises this instead of returning results, so tests
+    # can exercise the web layer's scan error handling.
+    scan_error: Exception | None = None
 
     # Populated by test code via set_read_value(); read() pops from here.
     _read_values: dict[tuple[str, str], list[bytes]] = field(default_factory=dict)
@@ -45,6 +48,8 @@ class MockBLEManager:
 
     def start_scan(self, duration_s: float) -> list[DiscoveredDevice]:
         self.scan_calls.append(duration_s)
+        if self.scan_error is not None:
+            raise self.scan_error
         return list(self.scan_results)
 
     def connect(

@@ -11,11 +11,12 @@ Side effects (connections, threads) run only from `__main__`; tests drive
 
 from __future__ import annotations
 
+import contextlib
 import logging
 import math
 import sqlite3
 import time
-from collections.abc import Callable
+from collections.abc import Callable, Iterator
 from dataclasses import dataclass
 
 from home_server.ble import parser
@@ -74,6 +75,9 @@ class BleRuntime:
         # address -> reconnect bookkeeping.
         self._monitor: dict[str, _DeviceMonitorState] = {}
         self._monitor_worker: PeriodicWorker | None = None
+        # Interval the monitor was last started with, so scan_window() can
+        # restore it after temporarily stopping the monitor for a scan.
+        self._monitor_interval_s: float = 1.0
 
     # ---- Initial bring-up ----
 
@@ -137,6 +141,7 @@ class BleRuntime:
         """Run the reconnect monitor in a background daemon thread."""
         if self._monitor_worker is not None:
             return
+        self._monitor_interval_s = interval_s
         self._monitor_worker = PeriodicWorker(
             lambda: self._monitor_tick(time.monotonic()),
             interval_s=interval_s,
@@ -148,6 +153,38 @@ class BleRuntime:
         if self._monitor_worker is not None:
             self._monitor_worker.stop()
             self._monitor_worker = None
+
+    # ---- Scan coordination ----
+
+    @contextlib.contextmanager
+    def scan_window(self) -> Iterator[None]:
+        """Free the BLE adapter for a scan, then restore normal operation.
+
+        bluepy cannot reliably run a ``Scanner`` on the same hci adapter while
+        peripherals are connected: the scan's mgmt ``scanend`` collides with a
+        disconnect event and raises ``BTLEDisconnectError``. So for the scan
+        body we stop the reconnect monitor and drop every live link; on exit we
+        restart the monitor (only if it was running), which reconnects and
+        re-subscribes each device over the next few ticks.
+        """
+        was_running = self._monitor_worker is not None
+        self.monitor_stop()
+        self._disconnect_all()
+        try:
+            yield
+        finally:
+            if was_running:
+                self.monitor_start(self._monitor_interval_s)
+
+    def _disconnect_all(self) -> None:
+        conn = self._conn_factory()
+        try:
+            addresses = [d.address for d in devices.list_all(conn)]
+        finally:
+            conn.close()
+        for address in addresses:
+            if self._ble.is_connected(address):
+                self._ble.disconnect(address)
 
     def _monitor_tick(self, now: float) -> None:
         """One reconnect pass. Pure w.r.t. time (caller passes `now`)."""

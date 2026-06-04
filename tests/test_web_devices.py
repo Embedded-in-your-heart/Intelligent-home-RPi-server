@@ -194,6 +194,19 @@ def test_scan_requires_login(client: FlaskClient) -> None:
     assert "/auth/login" in resp.headers["Location"]
 
 
+def test_scan_failure_returns_error_message_not_500(
+    logged_in_client: FlaskClient, mock_ble
+) -> None:
+    # A flaky BLE adapter (e.g. bluepy BTLEDisconnectError mid-scan) must not
+    # crash the endpoint; the user sees a recoverable message instead.
+    mock_ble.scan_error = RuntimeError("Device disconnected")
+    resp = logged_in_client.get("/devices/scan")
+    assert resp.status_code == 200
+    body = resp.get_data(as_text=True)
+    assert "掃描暫時失敗" in body
+    assert "No devices found" not in body
+
+
 def test_add_device_stores_addr_type_from_form(
     app: Flask, logged_in_client: FlaskClient
 ) -> None:
