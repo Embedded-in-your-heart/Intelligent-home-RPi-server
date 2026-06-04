@@ -28,18 +28,24 @@ def test_add_channel_appears_on_detail(
     token = _csrf_token(logged_in_client, f"/devices/{device_id}")
     resp = logged_in_client.post(
         f"/devices/{device_id}/channels",
-        data={
-            "name": "Humidity",
-            "type": "display",
-            "char_uuid": "uuid-h",
-            "data_format": "uint16_le",
-            "unit": "%",
-            "csrf_token": token,
-        },
+        data={"name": "Humidity", "preset": "uuid-temp", "csrf_token": token},
         follow_redirects=True,
     )
     assert resp.status_code == 200
     assert b"Humidity" in resp.data
+    # The preset (uuid-temp) determines the stored technical fields.
+    conn = connection.connect(app.config["DB_PATH"])
+    try:
+        created = channels.list_by_device(conn, device_id)
+    finally:
+        conn.close()
+    assert len(created) == 1
+    ch = created[0]
+    assert ch.name == "Humidity"
+    assert ch.char_uuid == "uuid-temp"
+    assert ch.type == "display"
+    assert ch.data_format == "float32_le"
+    assert ch.unit == "°C"
 
 
 def test_add_channel_duplicate_name_flashes(
@@ -62,14 +68,7 @@ def test_add_channel_duplicate_name_flashes(
     token = _csrf_token(logged_in_client, f"/devices/{device_id}")
     resp = logged_in_client.post(
         f"/devices/{device_id}/channels",
-        data={
-            "name": "Dup",
-            "type": "display",
-            "char_uuid": "u2",
-            "data_format": "uint8",
-            "unit": "",
-            "csrf_token": token,
-        },
+        data={"name": "Dup", "preset": "uuid-temp", "csrf_token": token},
     )
     assert resp.status_code == 200
     assert b"Channel name already exists" in resp.data
@@ -79,15 +78,28 @@ def test_add_channel_device_not_found(logged_in_client: FlaskClient) -> None:
     token = _csrf_token(logged_in_client, "/devices")
     resp = logged_in_client.post(
         "/devices/999/channels",
-        data={
-            "name": "X",
-            "type": "display",
-            "char_uuid": "u",
-            "data_format": "uint8",
-            "csrf_token": token,
-        },
+        data={"name": "X", "preset": "uuid-temp", "csrf_token": token},
     )
     assert resp.status_code == 404
+
+
+def test_add_channel_unknown_preset_rejected(
+    app: Flask, logged_in_client: FlaskClient
+) -> None:
+    device_id = _make_device(app, "AA:BB:CC:DD:EE:09", "Board3")
+    token = _csrf_token(logged_in_client, f"/devices/{device_id}")
+    resp = logged_in_client.post(
+        f"/devices/{device_id}/channels",
+        data={"name": "X", "preset": "uuid-nope", "csrf_token": token},
+        follow_redirects=True,
+    )
+    # SelectField choices validation rejects an unknown preset; no channel created.
+    assert resp.status_code == 200
+    conn = connection.connect(app.config["DB_PATH"])
+    try:
+        assert channels.list_by_device(conn, device_id) == []
+    finally:
+        conn.close()
 
 
 def test_delete_channel_removes_it(app: Flask, logged_in_client: FlaskClient) -> None:

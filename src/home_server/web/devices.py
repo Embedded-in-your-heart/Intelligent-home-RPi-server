@@ -11,7 +11,6 @@ from werkzeug.wrappers import Response
 from wtforms import HiddenField, StringField
 from wtforms.validators import DataRequired
 
-from home_server.ble import parser
 from home_server.db import devices
 from home_server.db.devices import DeviceNotFoundError, DuplicateAddressError
 from home_server.services.device_service import InvalidAddressError
@@ -71,7 +70,7 @@ def detail(device_id: int) -> str:
         "devices/detail.html",
         device=device,
         channels=device_channels,
-        formats=parser.supported_formats(),
+        presets=current_app.config["CHANNEL_PRESETS"],
         device_status=status,
     )
 

@@ -69,6 +69,10 @@ def create_app(config: Config, ble: BLEManager | None = None) -> Flask:
     app.config["DB_PATH"] = config.db_path
     app.config["BLE_SCAN_DURATION"] = config.ble_scan_duration
 
+    from home_server.presets import load_presets
+
+    app.config["CHANNEL_PRESETS"] = load_presets(config.channel_presets_path)
+
     socketio.init_app(app, async_mode="threading")
 
     if ble is None:
