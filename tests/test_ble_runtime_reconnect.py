@@ -119,22 +119,29 @@ def test_controller_only_device_reconnects(tmp_path: Path) -> None:
 
 
 class _LinkNeverUpBLE(MockBLEManager):
-    """connect() returns success but the link never actually comes up.
+    """ensure_connecting() kicks an attempt whose link never comes up.
 
-    Mirrors BluepyManager.connect() reusing an in-flight worker (is_alive but
-    not yet connected): the call returns without raising, yet is_connected()
-    stays False. A powered-off device exhibits exactly this.
+    Mirrors BluepyManager spinning up a worker for a powered-off peer: the
+    monitor's non-blocking reconnect returns at once, yet is_connected() stays
+    False. The runtime must not flap such a device to "connected".
     """
 
-    def connect(self, address: str, addr_type: str = "public"):  # type: ignore[override]
+    def ensure_connecting(self, address: str, addr_type: str = "public") -> None:
         self.connect_calls.append((address, addr_type))
-        return address  # NOTE: deliberately does NOT mark the device connected
+        # Deliberately does NOT mark the device connected.
+
+
+class _ConnectForbiddenBLE(MockBLEManager):
+    """Trips if the blocking connect() is used. The reconnect monitor must go
+    through the non-blocking ensure_connecting() instead."""
+
+    def connect(self, address: str, addr_type: str = "public") -> str:
+        raise AssertionError("monitor must not call blocking connect()")
 
 
 def test_powered_off_device_does_not_flap_connected(tmp_path: Path) -> None:
-    # Regression: a device whose connect() succeeds but never links up (powered
-    # off / in-flight worker) must never be reported 'connected' and must not
-    # oscillate connected<->disconnected.
+    # Regression: a device whose reconnect attempt never links up (powered off)
+    # must never be reported 'connected' and must not oscillate.
     path = tmp_path / "rt.db"
     _seed(path, with_display=False, with_controller=True)
     ble = _LinkNeverUpBLE()
@@ -149,8 +156,8 @@ def test_powered_off_device_does_not_flap_connected(tmp_path: Path) -> None:
 def test_reconnect_with_display_channel_does_not_raise_when_link_down(
     tmp_path: Path,
 ) -> None:
-    # A premature-success connect() must not lead to subscribing on an
-    # unconnected link (which would raise and crash the monitor tick).
+    # A reconnect attempt that never links up must not lead to subscribing on
+    # an unconnected link (which would raise and crash the monitor tick).
     path = tmp_path / "rt.db"
     _seed(path, with_display=True)
     ble = _LinkNeverUpBLE()
@@ -158,6 +165,20 @@ def test_reconnect_with_display_channel_does_not_raise_when_link_down(
     for t in (0.0, 1.0, 2.0):
         rt._monitor_tick(t)  # must not raise
     assert "connected" not in [s for _, s in statuses]
+
+
+def test_monitor_reconnect_uses_nonblocking_ensure_connecting(tmp_path: Path) -> None:
+    # The reconnect monitor must use the non-blocking ensure_connecting(), never
+    # the blocking connect(), so a slow peer can't stall it.
+    path = tmp_path / "rt.db"
+    _seed(path, with_display=True)
+    ble = _ConnectForbiddenBLE()
+    rt, statuses = _runtime(path, ble)
+    rt._monitor_tick(0.0)  # never connected -> disconnected, retry at 1.0
+    rt._monitor_tick(1.0)  # retry -> ensure_connecting links up -> connected
+    assert ble.is_connected(ADDR)
+    assert statuses[-1][1] == "connected"
+    ble.simulate_notify(ADDR, DISP_UUID, b"\x2a")  # subscribed on connect: no error
 
 
 def test_monitor_start_stop_lifecycle(tmp_path: Path) -> None:
@@ -168,7 +189,6 @@ def test_monitor_start_stop_lifecycle(tmp_path: Path) -> None:
     rt.activate()
     rt.monitor_start(interval_s=0.01)
     time.sleep(0.05)
-    thread = rt._monitor_thread
+    assert rt._monitor_worker is not None and rt._monitor_worker.is_running()
     rt.monitor_stop()
-    assert rt._monitor_thread is None
-    assert thread is not None and not thread.is_alive()
+    assert rt._monitor_worker is None

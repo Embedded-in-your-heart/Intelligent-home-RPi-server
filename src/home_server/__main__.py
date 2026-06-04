@@ -47,8 +47,8 @@ def main() -> None:
     if isinstance(ble, MockBLEManager):
         # Dev demo: discoverable devices so the Scan button shows output.
         ble.scan_results = [
-            DiscoveredDevice(address="C0:FF:EE:00:00:01", name="Demo Sensor", rssi=-55),
-            DiscoveredDevice(address="C0:FF:EE:00:00:02", name="Demo Lamp", rssi=-61),
+            DiscoveredDevice(address="C0:FF:EE:00:00:01", name="HOME-Demo Sensor", rssi=-55),
+            DiscoveredDevice(address="C0:FF:EE:00:00:02", name="HOME-Demo Lamp", rssi=-61),
         ]
     app = create_app(config, ble=ble)
 

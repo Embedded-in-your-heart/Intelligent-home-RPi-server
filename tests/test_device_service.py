@@ -133,6 +133,47 @@ def test_add_device_uses_explicit_addr_type(db_conn, owner) -> None:
     assert mock.connect_calls == [(RANDOM_ADDR, "public")]
 
 
+def test_scan_default_prefix_filters_home_prefix() -> None:
+    # Default prefix "HOME-" keeps only matching devices (existing behaviour).
+    mock = MockBLEManager(
+        scan_results=[
+            DiscoveredDevice("AA:BB:CC:DD:EE:01", "HOME-Sensor", -40),
+            DiscoveredDevice("AA:BB:CC:DD:EE:02", "Other", -50),
+            DiscoveredDevice("AA:BB:CC:DD:EE:03", None, -60),
+        ]
+    )
+    svc = DeviceService(mock)
+    found = svc.scan(5.0)
+    assert [d.name for d in found] == ["HOME-Sensor"]
+
+
+def test_scan_custom_prefix_filters_by_that_prefix() -> None:
+    mock = MockBLEManager(
+        scan_results=[
+            DiscoveredDevice("AA:BB:CC:DD:EE:01", "DEV-Alpha", -40),
+            DiscoveredDevice("AA:BB:CC:DD:EE:02", "HOME-Beta", -50),
+            DiscoveredDevice("AA:BB:CC:DD:EE:03", None, -60),
+        ]
+    )
+    svc = DeviceService(mock, scan_name_prefix="DEV-")
+    found = svc.scan(5.0)
+    assert [d.name for d in found] == ["DEV-Alpha"]
+
+
+def test_scan_empty_prefix_surfaces_all_named_devices() -> None:
+    # Empty prefix disables prefix filtering; unnamed devices are still excluded.
+    mock = MockBLEManager(
+        scan_results=[
+            DiscoveredDevice("AA:BB:CC:DD:EE:01", "HOME-Sensor", -40),
+            DiscoveredDevice("AA:BB:CC:DD:EE:02", "AnyName", -50),
+            DiscoveredDevice("AA:BB:CC:DD:EE:03", None, -60),
+        ]
+    )
+    svc = DeviceService(mock, scan_name_prefix="")
+    found = svc.scan(5.0)
+    assert [d.name for d in found] == ["HOME-Sensor", "AnyName"]
+
+
 def test_add_device_coerces_invalid_addr_type_to_inference(db_conn, owner) -> None:
     # A tampered request could supply a value outside the CHECK allowlist; it
     # must be coerced (here: inferred -> "random") rather than raising on insert.

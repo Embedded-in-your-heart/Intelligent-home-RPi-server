@@ -95,3 +95,39 @@ def test_activate_connects_with_device_addr_type(db_path: Path) -> None:
     rt.activate()
     # db_path fixture created the device without addr_type -> defaults public.
     assert ble.connect_calls == [(ADDR, "public")]
+
+
+def test_scan_window_drops_connections_to_free_the_adapter(db_path: Path) -> None:
+    # bluepy cannot reliably scan while peripherals are connected on the same
+    # adapter, so scan_window() must disconnect every live link for its body.
+    ble = MockBLEManager()
+    rt, _ = _runtime(db_path, ble)
+    rt.activate()
+    assert ble.is_connected(ADDR)
+    with rt.scan_window():
+        assert not ble.is_connected(ADDR)
+
+
+def test_scan_window_does_not_spawn_monitor_when_not_running(db_path: Path) -> None:
+    # The test app never starts the monitor; scan_window() must not start one
+    # (which would leak a background thread into otherwise thread-free tests).
+    ble = MockBLEManager()
+    rt, _ = _runtime(db_path, ble)
+    rt.activate()
+    with rt.scan_window():
+        pass
+    assert rt._monitor_worker is None
+
+
+def test_scan_window_restarts_monitor_when_running(db_path: Path) -> None:
+    ble = MockBLEManager()
+    rt, _ = _runtime(db_path, ble)
+    rt.activate()
+    rt.monitor_start(interval_s=0.05)
+    try:
+        assert rt._monitor_worker is not None
+        with rt.scan_window():
+            assert rt._monitor_worker is None  # stopped to free the adapter
+        assert rt._monitor_worker is not None  # restored afterwards
+    finally:
+        rt.monitor_stop()

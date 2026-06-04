@@ -139,11 +139,10 @@ def test_start_then_stop_emits_and_terminates() -> None:
     mgr.subscribe("aa:bb", "uuid-x", received.append)
     mgr.start(lambda address, char_uuid: b"\x01", interval_s=0.01)
     time.sleep(0.05)
-    thread = mgr._producer_thread
+    assert mgr._producer is not None and mgr._producer.is_running()
     mgr.stop()
     assert len(received) >= 1
-    assert mgr._producer_thread is None
-    assert thread is not None and not thread.is_alive()
+    assert mgr._producer is None
 
 
 def test_connect_records_address_and_addr_type() -> None:
@@ -157,3 +156,16 @@ def test_connect_defaults_addr_type_public() -> None:
     mock = MockBLEManager()
     mock.connect("aa:bb:cc:dd:ee:ff")
     assert mock.connect_calls == [("aa:bb:cc:dd:ee:ff", "public")]
+
+
+def test_ensure_connecting_links_up_without_blocking() -> None:
+    mgr = MockBLEManager()
+    mgr.ensure_connecting("aa:bb", "random")
+    assert mgr.is_connected("aa:bb")
+    assert mgr.connect_calls == [("aa:bb", "random")]
+
+
+def test_ensure_connecting_respects_fail_connect_for() -> None:
+    mgr = MockBLEManager(fail_connect_for={"aa:bb"})
+    mgr.ensure_connecting("aa:bb")  # never raises
+    assert not mgr.is_connected("aa:bb")

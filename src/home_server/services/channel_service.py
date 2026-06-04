@@ -1,8 +1,9 @@
 """Channel service: CRUD, control writes, and notify handling.
 
 Notify handling is a plain method (`handle_notify`) taking the caller's
-connection — the BLE worker-thread wiring that calls it lives in a later phase.
-UI push (on_reading) is unthrottled; DB persistence is rate-limited per channel.
+connection; the BLE worker-thread wiring is implemented in
+`services/ble_runtime.py` (BleRuntime.subscribe_channel). UI push (on_reading)
+is unthrottled; DB persistence is rate-limited per channel.
 """
 
 from __future__ import annotations

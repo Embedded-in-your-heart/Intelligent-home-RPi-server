@@ -35,6 +35,7 @@ class Config:
     admin_password: str | None
     debug: bool
     ble_backend: str = "auto"
+    scan_name_prefix: str = "HOME-"
 
     @classmethod
     def from_env(cls) -> Config:
@@ -60,4 +61,5 @@ class Config:
             admin_password=os.environ.get("HOME_SERVER_ADMIN_PASSWORD") or None,
             debug=debug,
             ble_backend=_env_str("HOME_SERVER_BLE_BACKEND", "auto"),
+            scan_name_prefix=_env_str("HOME_SERVER_SCAN_NAME_PREFIX", "HOME-"),
         )

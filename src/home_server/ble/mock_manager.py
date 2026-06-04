@@ -10,9 +10,10 @@ Test code arranges:
 
 from __future__ import annotations
 
-import threading
 from collections.abc import Callable
 from dataclasses import dataclass, field
+
+from home_server.core.periodic import PeriodicWorker
 
 from .interface import ConnectionHandle, DiscoveredDevice, NotifyCallback
 
@@ -25,6 +26,9 @@ class MockBLEError(Exception):
 class MockBLEManager:
     scan_results: list[DiscoveredDevice] = field(default_factory=list)
     fail_connect_for: set[str] = field(default_factory=set)
+    # When set, start_scan() raises this instead of returning results, so tests
+    # can exercise the web layer's scan error handling.
+    scan_error: Exception | None = None
 
     # Populated by test code via set_read_value(); read() pops from here.
     _read_values: dict[tuple[str, str], list[bytes]] = field(default_factory=dict)
@@ -38,17 +42,14 @@ class MockBLEManager:
     connect_calls: list[tuple[str, str]] = field(default_factory=list)
 
     # Dev-only synthetic producer (see start()/stop()). Not part of equality.
-    _producer_thread: threading.Thread | None = field(
-        default=None, compare=False, repr=False
-    )
-    _producer_stop: threading.Event | None = field(
-        default=None, compare=False, repr=False
-    )
+    _producer: PeriodicWorker | None = field(default=None, compare=False, repr=False)
 
     # ---- BLEManager protocol ----
 
     def start_scan(self, duration_s: float) -> list[DiscoveredDevice]:
         self.scan_calls.append(duration_s)
+        if self.scan_error is not None:
+            raise self.scan_error
         return list(self.scan_results)
 
     def connect(
@@ -59,6 +60,15 @@ class MockBLEManager:
             raise MockBLEError(f"Mocked connect failure for {address}")
         self._connected.add(address)
         return address
+
+    def ensure_connecting(self, address: str, addr_type: str = "public") -> None:
+        # Non-blocking analogue of connect(): records the attempt and links up
+        # synchronously, except for fail_connect_for addresses which stay down
+        # (modelling a peer whose link never comes up). Never raises.
+        self.connect_calls.append((address, addr_type))
+        if address in self.fail_connect_for:
+            return
+        self._connected.add(address)
 
     def disconnect(self, handle: ConnectionHandle) -> None:
         self._connected.discard(handle)
@@ -109,26 +119,19 @@ class MockBLEManager:
         skip that subscription this tick. Dev/demo use only — tests drive
         notifications synchronously via simulate_notify().
         """
-        if self._producer_thread is not None:
+        if self._producer is not None:
             return
-        stop = threading.Event()
-
-        def _run() -> None:
-            while not stop.wait(interval_s):
-                self._tick(feed)
-
-        thread = threading.Thread(target=_run, name="mock-ble-producer", daemon=True)
-        self._producer_stop = stop
-        self._producer_thread = thread
-        thread.start()
+        self._producer = PeriodicWorker(
+            lambda: self._tick(feed),
+            interval_s=interval_s,
+            name="mock-ble-producer",
+        )
+        self._producer.start()
 
     def stop(self) -> None:
-        if self._producer_stop is not None:
-            self._producer_stop.set()
-        if self._producer_thread is not None:
-            self._producer_thread.join(timeout=2.0)
-        self._producer_thread = None
-        self._producer_stop = None
+        if self._producer is not None:
+            self._producer.stop()
+            self._producer = None
 
     def _tick(self, feed: Callable[[str, str], bytes | None]) -> None:
         for (address, char_uuid), callback in list(self._subscriptions.items()):
