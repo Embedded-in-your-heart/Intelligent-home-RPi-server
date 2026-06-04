@@ -36,6 +36,7 @@ class Config:
     debug: bool
     ble_backend: str = "auto"
     scan_name_prefix: str = "HOME-"
+    channel_presets_path: Path = Path("./data/channel_presets.json")
 
     @classmethod
     def from_env(cls) -> Config:
@@ -62,4 +63,9 @@ class Config:
             debug=debug,
             ble_backend=_env_str("HOME_SERVER_BLE_BACKEND", "auto"),
             scan_name_prefix=_env_str("HOME_SERVER_SCAN_NAME_PREFIX", "HOME-"),
+            channel_presets_path=Path(
+                _env_str(
+                    "HOME_SERVER_CHANNEL_PRESETS_PATH", "./data/channel_presets.json"
+                )
+            ),
         )
