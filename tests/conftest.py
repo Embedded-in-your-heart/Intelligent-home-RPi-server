@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import json
 import re
 import sqlite3
 from collections.abc import Iterator
@@ -44,6 +45,27 @@ def app(tmp_path: Path, mock_ble: MockBLEManager) -> Flask:
     # same database — distinct :memory: connections would each be empty.
     db_path = tmp_path / "test.db"
     connection.initialize(db_path)
+    presets_path = tmp_path / "channel_presets.json"
+    presets_path.write_text(
+        json.dumps(
+            [
+                {
+                    "label": "Temp",
+                    "char_uuid": "uuid-temp",
+                    "type": "display",
+                    "data_format": "float32_le",
+                    "unit": "°C",
+                },
+                {
+                    "label": "LED",
+                    "char_uuid": "uuid-led",
+                    "type": "controller",
+                    "data_format": "uint8",
+                },
+            ]
+        ),
+        encoding="utf-8",
+    )
     config = Config(
         db_path=db_path,
         secret_key="test-secret",
@@ -55,6 +77,7 @@ def app(tmp_path: Path, mock_ble: MockBLEManager) -> Flask:
         admin_username="admin",
         admin_password=None,
         debug=True,
+        channel_presets_path=presets_path,
     )
     flask_app = create_app(config, ble=mock_ble)
     flask_app.config["TESTING"] = True

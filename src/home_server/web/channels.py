@@ -5,6 +5,7 @@ from __future__ import annotations
 from flask import (
     Blueprint,
     abort,
+    current_app,
     flash,
     jsonify,
     redirect,
@@ -30,14 +31,7 @@ bp = Blueprint("channels", __name__)
 
 class AddChannelForm(FlaskForm):
     name = StringField("Name", validators=[DataRequired()])
-    type = SelectField(
-        "Type", choices=[("controller", "controller"), ("display", "display")]
-    )
-    char_uuid = StringField("Characteristic UUID", validators=[DataRequired()])
-    data_format = SelectField(
-        "Data format", choices=[(f, f) for f in parser.supported_formats()]
-    )
-    unit = StringField("Unit")
+    preset = SelectField("Function", validators=[DataRequired()])
 
 
 @bp.post("/devices/<int:device_id>/channels")
@@ -47,28 +41,34 @@ def add_channel(device_id: int) -> Response | str:
     device = devices.get_by_id(conn, device_id)
     if device is None:
         abort(404)
+    presets = current_app.config["CHANNEL_PRESETS"]
     form = AddChannelForm()
+    form.preset.choices = [(p.char_uuid, p.label) for p in presets]
     if form.validate_on_submit():
-        try:
-            get_channel_service().add_channel(
-                conn,
-                device_id=device_id,
-                name=form.name.data,
-                type=form.type.data,
-                char_uuid=form.char_uuid.data,
-                data_format=form.data_format.data,
-                unit=form.unit.data or None,
-            )
-        except DuplicateChannelNameError:
-            flash("Channel name already exists on this device")
+        preset = next((p for p in presets if p.char_uuid == form.preset.data), None)
+        if preset is None:
+            flash("Unknown channel function")
         else:
-            return redirect(url_for("devices.detail", device_id=device_id))
+            try:
+                get_channel_service().add_channel(
+                    conn,
+                    device_id=device_id,
+                    name=form.name.data,
+                    type=preset.type,
+                    char_uuid=preset.char_uuid,
+                    data_format=preset.data_format,
+                    unit=preset.unit,
+                )
+            except DuplicateChannelNameError:
+                flash("Channel name already exists on this device")
+            else:
+                return redirect(url_for("devices.detail", device_id=device_id))
     device_channels = channels.list_by_device(conn, device_id)
     return render_template(
         "devices/detail.html",
         device=device,
         channels=device_channels,
-        formats=parser.supported_formats(),
+        presets=presets,
     )
 
 

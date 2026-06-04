@@ -78,36 +78,44 @@
 <div class="card shadow-sm">
   <div class="card-body">
     <h2 class="card-title h5 mb-3">Add channel</h2>
+    {% if presets %}
     <form method="post"
           action="{{ url_for('channels.add_channel', device_id=device.id) }}"
           class="row g-2">
       <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-      <div class="col-sm-3">
-        <input class="form-control" name="name" placeholder="Temperature" required>
-      </div>
-      <div class="col-sm-2">
-        <select class="form-select" name="type">
-          <option value="display">display</option>
-          <option value="controller">controller</option>
-        </select>
-      </div>
-      <div class="col-sm-3">
-        <input class="form-control" name="char_uuid" placeholder="Characteristic UUID" required>
-      </div>
-      <div class="col-sm-2">
-        <select class="form-select" name="data_format">
-          {% for fmt in formats %}
-          <option value="{{ fmt }}">{{ fmt }}</option>
+      <div class="col-sm-5">
+        <select id="channel-preset" class="form-select" name="preset">
+          {% for p in presets %}
+          <option value="{{ p.char_uuid }}" data-label="{{ p.label }}">{{ p.label }}</option>
           {% endfor %}
         </select>
       </div>
-      <div class="col-sm-1">
-        <input class="form-control" name="unit" placeholder="Unit">
+      <div class="col-sm-5">
+        <input id="channel-name" class="form-control" name="name" placeholder="名稱" required>
       </div>
-      <div class="col-sm-1 d-grid">
+      <div class="col-sm-2 d-grid">
         <button class="btn btn-primary" type="submit">Add</button>
       </div>
     </form>
+    <script>
+      (function () {
+        const sel = document.getElementById('channel-preset');
+        const nameInput = document.getElementById('channel-name');
+        if (!sel || !nameInput) return;
+        let edited = false;
+        nameInput.addEventListener('input', function () { edited = true; });
+        function fill() {
+          if (edited && nameInput.value.trim() !== '') return;
+          const opt = sel.selectedOptions[0];
+          if (opt) nameInput.value = opt.dataset.label || opt.textContent;
+        }
+        sel.addEventListener('change', fill);
+        fill();
+      })();
+    </script>
+    {% else %}
+    <p class="text-muted mb-0">尚未設定任何功能，請編輯 <code>data/channel_presets.json</code>。</p>
+    {% endif %}
   </div>
 </div>
 {% endblock %}
