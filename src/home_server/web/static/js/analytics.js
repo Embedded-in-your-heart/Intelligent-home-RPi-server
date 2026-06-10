@@ -207,18 +207,28 @@
       var sub = bySub[d.channel_id];
       if (sub) {
         var chart = sub.chart;
+        var data = chart.data.datasets[sub.datasetIndex].data;
         var point = { x: tsToMs(d.timestamp), y: d.value };
-        chart.data.datasets[sub.datasetIndex].data.push(point);
+        // Live timestamps have 1-second resolution but readings arrive
+        // unthrottled (several per second). On the linear time axis, multiple
+        // points sharing the same x draw as vertical zig-zags. Collapse same-
+        // second readings to one point (keep latest) to match the per-second
+        // resolution of the downsampled history.
+        var last = data[data.length - 1];
+        if (last && last.x === point.x) {
+          last.y = point.y;
+        } else {
+          data.push(point);
+        }
 
         if (currentWindow) {
           // Drop points that fell outside the selected observation window.
           var cutoff = Date.now() - WINDOW_MS[currentWindow];
-          while (chart.data.datasets[sub.datasetIndex].data.length &&
-                 chart.data.datasets[sub.datasetIndex].data[0].x < cutoff) {
-            chart.data.datasets[sub.datasetIndex].data.shift();
+          while (data.length && data[0].x < cutoff) {
+            data.shift();
           }
-        } else if (chart.data.datasets[sub.datasetIndex].data.length > 60) {
-          chart.data.datasets[sub.datasetIndex].data.shift();
+        } else if (data.length > 60) {
+          data.shift();
         }
         chart.update();
       }
