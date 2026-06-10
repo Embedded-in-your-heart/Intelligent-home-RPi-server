@@ -1,3 +1,4 @@
+{% from "_channel_widget.html" import channel_widget %}
 {% extends "base.html" %}
 {% block title %}{{ device.display_name }}{% endblock %}
 {% block content %}
@@ -53,42 +54,7 @@
     {% for channel in channels %}
     <div class="mb-4">
       <h3 class="h6">{{ channel.name }} <small class="text-muted">({{ channel.type }})</small></h3>
-      {% if channel.type == "display" and channel.unit == "0/1" %}
-      <div class="d-flex align-items-center gap-2" data-flag-channel-id="{{ channel.id }}" data-flag-name="{{ channel.name }}">
-        <span class="flag-led" data-flag-led></span>
-        <span class="fw-semibold" data-flag-state>—</span>
-        <small class="text-muted" data-flag-last>載入中…</small>
-      </div>
-      {% elif channel.type == "display" and parse_enum_unit(channel.unit) is not none %}
-      {% set enum_labels = parse_enum_unit(channel.unit) %}
-      <div class="d-flex align-items-center gap-2" data-enum-channel-id="{{ channel.id }}" data-enum-labels='{{ enum_labels|tojson }}'><span class="badge text-bg-secondary fs-6" data-enum-state>—</span><small class="text-muted" data-enum-last>載入中…</small></div>
-      {% elif channel.type == "display" %}
-      <canvas data-channel-id="{{ channel.id }}" data-unit="{{ channel.unit or '' }}" height="80"></canvas>
-      {% elif channel.type == "controller" and channel.unit == "0/1" %}
-      <form hx-post="{{ url_for('channels.write_channel', channel_id=channel.id) }}"
-            hx-swap="none"
-            class="form-check form-switch">
-        {% set on = control_states.get(channel.id) %}
-        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-        <input type="hidden" name="value" value="{{ '1' if on else '0' }}">
-        <input class="form-check-input" type="checkbox" role="switch"
-               id="led-switch-{{ channel.id }}"{% if on %} checked{% endif %}
-               onchange="var on=this.checked; this.form.elements.value.value = on ? '1' : '0'; this.nextElementSibling.textContent = on ? '開' : '關'; this.form.requestSubmit();">
-        <label class="form-check-label" for="led-switch-{{ channel.id }}">{{ '開' if on else '關' }}</label>
-      </form>
-      {% else %}
-      <form method="post"
-            action="{{ url_for('channels.write_channel', channel_id=channel.id) }}"
-            class="row g-2">
-        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-        <div class="col-auto">
-          <input class="form-control form-control-sm" name="value" placeholder="value" required>
-        </div>
-        <div class="col-auto">
-          <button class="btn btn-sm btn-primary" type="submit">Send</button>
-        </div>
-      </form>
-      {% endif %}
+      {{ channel_widget(channel, control_states, 80) }}
     </div>
     {% endfor %}
   </div>
