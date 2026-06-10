@@ -24,6 +24,36 @@
       return ms ? new Date(ms).toLocaleString() : (ts || null);
     }
 
+    function escapeHtml(s) {
+      var d = document.createElement("div");
+      d.textContent = s == null ? "" : String(s);
+      return d.innerHTML;
+    }
+
+    // Pop a transient Bootstrap toast in the top-right. Used to alert the user
+    // the moment a 0/1 flag channel rises to 1 (triggered).
+    function showToast(title, ts) {
+      var container = document.getElementById("toast-container");
+      if (!container || typeof bootstrap === "undefined") return;
+      var el = document.createElement("div");
+      el.className = "toast align-items-center text-bg-danger border-0";
+      el.setAttribute("role", "alert");
+      el.setAttribute("aria-live", "assertive");
+      el.setAttribute("aria-atomic", "true");
+      var when = formatTs(ts);
+      el.innerHTML =
+        '<div class="d-flex">' +
+        '<div class="toast-body">⚠️ ' + escapeHtml(title) + " 觸發！" +
+        (when ? '<div class="small text-white-50">' + escapeHtml(when) + "</div>" : "") +
+        "</div>" +
+        '<button type="button" class="btn-close btn-close-white me-2 m-auto" data-bs-dismiss="toast" aria-label="Close"></button>' +
+        "</div>";
+      container.appendChild(el);
+      var toast = new bootstrap.Toast(el, { delay: 5000 });
+      el.addEventListener("hidden.bs.toast", function () { el.remove(); });
+      toast.show();
+    }
+
     // Global observation window: how far back charts show. Buttons in
     // #window-selector switch it; the live feed trims to the same span.
     var WINDOW_MS = { "1m": 60e3, "10m": 600e3, "1h": 3600e3, "1d": 86400e3, "1w": 604800e3 };
@@ -101,13 +131,19 @@
         lastEl.textContent = lt ? "上次觸發：" + lt : "尚無觸發記錄";
       }
 
-      var entry = { render: render, lastOn: null };
+      var entry = {
+        render: render,
+        lastOn: null,
+        on: false,
+        name: el.getAttribute("data-flag-name") || "警示",
+      };
       flags[channelId] = entry;
 
       fetch("/channels/" + channelId + "/flag")
         .then(function (r) { return r.json(); })
         .then(function (j) {
           entry.lastOn = j.last_on_at || null;
+          entry.on = j.value != null && j.value >= FLAG_ON;
           render(j.value, entry.lastOn);
         })
         .catch(function (err) {
@@ -137,7 +173,11 @@
       }
       var flag = flags[d.channel_id];
       if (flag) {
-        if (d.value >= FLAG_ON) flag.lastOn = d.timestamp;
+        var nowOn = d.value >= FLAG_ON;
+        // Only toast on the rising edge (0 -> 1), not on every "still on" reading.
+        if (nowOn && !flag.on) showToast(flag.name, d.timestamp);
+        flag.on = nowOn;
+        if (nowOn) flag.lastOn = d.timestamp;
         flag.render(d.value, flag.lastOn);
       }
     });

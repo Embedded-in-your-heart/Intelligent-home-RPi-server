@@ -38,6 +38,8 @@
     </div>
   </nav>
 
+  <div class="toast-container position-fixed top-0 end-0 p-3" id="toast-container" style="z-index: 1080;"></div>
+
   <main class="container py-4">
     {% with messages = get_flashed_messages() %}
       {% if messages %}

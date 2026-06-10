@@ -117,15 +117,18 @@ def create_app(config: Config, ble: BLEManager | None = None) -> Flask:
     @login_required
     def index() -> str:
         conn = get_conn()
-        overview = [
-            (
-                d,
-                "connected" if device_service.is_connected(d.address) else "disconnected",
-                db_channels.list_by_device(conn, d.id),
+        overview = []
+        control_states: dict[int, bool] = {}
+        for d in db_devices.list_all(conn):
+            chans = db_channels.list_by_device(conn, d.id)
+            status = (
+                "connected" if device_service.is_connected(d.address) else "disconnected"
             )
-            for d in db_devices.list_all(conn)
-        ]
-        return render_template("index.html", overview=overview)
+            overview.append((d, status, chans))
+            control_states.update(channel_service.control_states(conn, chans))
+        return render_template(
+            "index.html", overview=overview, control_states=control_states
+        )
 
     @app.get("/health")
     def health() -> dict[str, str]:

@@ -90,6 +90,37 @@ def test_write_command_encodes_and_writes(db_conn, device_id) -> None:
     assert mock.writes_for(ADDR, CTRL_UUID) == [parser.encode(1, "uint8")]
 
 
+def test_write_command_persists_commanded_value(db_conn, device_id) -> None:
+    svc, _ = _make_service()
+    channel = svc.add_channel(
+        db_conn,
+        device_id=device_id,
+        name="led",
+        type="controller",
+        char_uuid=CTRL_UUID,
+        data_format="uint8",
+        unit="0/1",
+    )
+    svc.write_command(db_conn, channel_id=channel.id, raw_value=1)
+    assert svc.control_states(db_conn, [channel]) == {channel.id: True}
+    svc.write_command(db_conn, channel_id=channel.id, raw_value=0)
+    assert svc.control_states(db_conn, [channel]) == {channel.id: False}
+
+
+def test_control_states_defaults_off_without_command(db_conn, device_id) -> None:
+    svc, _ = _make_service()
+    channel = svc.add_channel(
+        db_conn,
+        device_id=device_id,
+        name="led",
+        type="controller",
+        char_uuid=CTRL_UUID,
+        data_format="uint8",
+        unit="0/1",
+    )
+    assert svc.control_states(db_conn, [channel]) == {channel.id: False}
+
+
 def test_write_command_rejects_display_channel(db_conn, device_id) -> None:
     svc, _ = _make_service()
     channel = svc.add_channel(

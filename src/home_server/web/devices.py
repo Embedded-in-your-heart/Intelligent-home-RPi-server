@@ -78,6 +78,7 @@ def detail(device_id: int) -> str:
         "devices/detail.html",
         device=device,
         channels=device_channels,
+        control_states=get_channel_service().control_states(conn, device_channels),
         presets=avail,
         presets_exhausted=bool(presets) and not avail,
         device_status=status,

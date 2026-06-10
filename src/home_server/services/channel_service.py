@@ -112,6 +112,10 @@ class ChannelService:
         device = devices.get_by_id(conn, channel.device_id)
         assert device is not None
         self._ble.write(device.address, channel.char_uuid, data)
+        # Persist the commanded value: controllers are write-only over BLE, so
+        # this reading is the only record of the last command and lets the UI
+        # restore the control's state after a reload.
+        readings.insert(conn, channel_id=channel_id, value=raw_value)
 
     def handle_notify(
         self,
@@ -188,6 +192,21 @@ class ChannelService:
         latest = readings.latest_by_channel(conn, channel_id)
         last_on = readings.latest_at_or_above(conn, channel_id, _FLAG_ON_THRESHOLD)
         return latest, last_on
+
+    def control_states(
+        self, conn: sqlite3.Connection, chans: list[Channel]
+    ) -> dict[int, bool]:
+        """On/off state for 0/1 controller channels, keyed by channel id.
+
+        ``True`` means the last commanded value was 1 (on). Channels without a
+        recorded command default to ``False`` (off).
+        """
+        states: dict[int, bool] = {}
+        for ch in chans:
+            if ch.type == "controller" and ch.unit == "0/1":
+                latest = readings.latest_by_channel(conn, ch.id)
+                states[ch.id] = latest is not None and latest.value >= _FLAG_ON_THRESHOLD
+        return states
 
     def list_by_device(
         self, conn: sqlite3.Connection, device_id: int

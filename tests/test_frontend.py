@@ -3,7 +3,7 @@
 from flask import Flask
 from flask.testing import FlaskClient
 
-from home_server.db import channels, connection, devices
+from home_server.db import channels, connection, devices, readings
 
 
 def _make_device(app: Flask, address: str, name: str) -> int:
@@ -61,6 +61,13 @@ def test_detail_shows_flag_for_binary_channel(
     body = logged_in_client.get(f"/devices/{device_id}").get_data(as_text=True)
     assert f'data-flag-channel-id="{channel_id}"' in body
     assert f'data-channel-id="{channel_id}"' not in body
+    # The flag carries its name so the live feed can label the trigger toast.
+    assert 'data-flag-name="Shake"' in body
+
+
+def test_base_includes_toast_container(logged_in_client: FlaskClient) -> None:
+    body = logged_in_client.get("/").get_data(as_text=True)
+    assert 'id="toast-container"' in body
 
 
 def test_detail_shows_control_form_for_controller(
@@ -93,6 +100,25 @@ def test_detail_shows_switch_for_binary_controller(
     assert f'hx-post="/channels/{channel_id}/write"' in body
     # The number input must be gone for a 0/1 controller.
     assert 'placeholder="value"' not in body
+
+
+def test_switch_reflects_last_commanded_state(
+    app: Flask, logged_in_client: FlaskClient
+) -> None:
+    device_id = _make_device(app, "AA:BB:CC:DD:EE:45", "Lamp")
+    conn = connection.connect(app.config["DB_PATH"])
+    try:
+        channel_id = channels.create(
+            conn, device_id=device_id, name="LED1", type="controller",
+            char_uuid="uuid-led2", data_format="uint8", unit="0/1",
+        )
+        readings.insert(conn, channel_id=channel_id, value=1)
+        conn.commit()
+    finally:
+        conn.close()
+    body = logged_in_client.get(f"/devices/{device_id}").get_data(as_text=True)
+    # The switch starts in the "on" position because the last command was 1.
+    assert f'id="led-switch-{channel_id}" checked' in body
 
 
 def test_list_has_scan_button(logged_in_client: FlaskClient) -> None:
