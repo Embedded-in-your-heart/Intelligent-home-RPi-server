@@ -124,10 +124,36 @@
             chart.data.datasets[0].data.push(pt.value);
           });
           chart.update();
+          updateStats(channelId);
         })
         .catch(function (err) {
           console.warn("history fetch failed for channel " + channelId, err);
         });
+    }
+
+    function updateStats(channelId) {
+      var chart = charts[channelId];
+      if (!chart) return;
+      var data = chart.data.datasets[0].data;
+      var box = document.querySelector('[data-stats-for="' + channelId + '"]');
+      if (!box) return;
+      var nums = data.filter(function (v) { return typeof v === "number" && isFinite(v); });
+      function fmt(n) { return String(Math.round(n * 100) / 100); }
+      if (nums.length === 0) {
+        box.querySelector('[data-stat="cur"]').textContent = "—";
+        box.querySelector('[data-stat="min"]').textContent = "—";
+        box.querySelector('[data-stat="max"]').textContent = "—";
+        box.querySelector('[data-stat="avg"]').textContent = "—";
+        return;
+      }
+      var cur = nums[nums.length - 1];
+      var min = Math.min.apply(null, nums);
+      var max = Math.max.apply(null, nums);
+      var avg = nums.reduce(function (sum, n) { return sum + n; }, 0) / nums.length;
+      box.querySelector('[data-stat="cur"]').textContent = fmt(cur);
+      box.querySelector('[data-stat="min"]').textContent = fmt(min);
+      box.querySelector('[data-stat="max"]').textContent = fmt(max);
+      box.querySelector('[data-stat="avg"]').textContent = fmt(avg);
     }
 
     canvases.forEach(function (canvas) {
@@ -212,6 +238,7 @@
           chart.data.datasets[0].data.shift();
         }
         chart.update();
+        updateStats(d.channel_id);
       }
       var flag = flags[d.channel_id];
       if (flag) {

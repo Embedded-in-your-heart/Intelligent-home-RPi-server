@@ -48,6 +48,9 @@
             </div>
             {% elif channel.type == "display" %}
             <canvas data-channel-id="{{ channel.id }}" data-unit="{{ channel.unit or '' }}" height="70"></canvas>
+            <div class="small text-muted mt-1" data-stats-for="{{ channel.id }}">
+              現值 <span data-stat="cur">—</span>　最小 <span data-stat="min">—</span>　最大 <span data-stat="max">—</span>　平均 <span data-stat="avg">—</span>
+            </div>
             {% elif channel.type == "controller" and channel.unit == "0/1" %}
             <form hx-post="{{ url_for('channels.write_channel', channel_id=channel.id) }}"
                   hx-swap="none"
