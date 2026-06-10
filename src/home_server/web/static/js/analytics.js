@@ -63,6 +63,30 @@
     var charts = {};  // keyed by chart canvas element
     var bySub = {};   // keyed by channelId: { chart, datasetIndex, deviceName }
 
+    // Pin the linear x-axis to the actual data extent (across all datasets).
+    // Without this, Chart.js rounds the axis out to "nice" tick boundaries,
+    // leaving the line squeezed in the middle with blank margins on both
+    // sides. Fitting min/max to the data fills the width: the full window when
+    // readings are plentiful, a tight fit when they are sparse.
+    function fitXRange(chart) {
+      var minX = Infinity;
+      var maxX = -Infinity;
+      chart.data.datasets.forEach(function (ds) {
+        ds.data.forEach(function (pt) {
+          if (pt.x < minX) minX = pt.x;
+          if (pt.x > maxX) maxX = pt.x;
+        });
+      });
+      if (minX <= maxX) {
+        chart.options.scales.x.min = minX;
+        chart.options.scales.x.max = maxX;
+      } else {
+        // No points yet: let Chart.js auto-range.
+        chart.options.scales.x.min = undefined;
+        chart.options.scales.x.max = undefined;
+      }
+    }
+
     function loadChart(channelId) {
       var sub = bySub[channelId];
       if (!sub) return;
@@ -79,6 +103,7 @@
           // Sort by x ascending to ensure correct left-to-right ordering
           data.sort(function (a, b) { return a.x - b.x; });
           chart.data.datasets[sub.datasetIndex].data = data;
+          fitXRange(chart);
           chart.update();
         })
         .catch(function (err) {
@@ -230,6 +255,7 @@
         } else if (data.length > 60) {
           data.shift();
         }
+        fitXRange(chart);
         chart.update();
       }
 
