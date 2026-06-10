@@ -17,6 +17,7 @@ CTRL_UUID = "uuid-ctrl"
 FLAG_UUID = "uuid-flag"
 ENUM_UUID = "uuid-sound-class"
 DBA_UUID = "uuid-dba"
+MG_UUID = "uuid-vib-rms"
 
 
 @pytest.fixture
@@ -47,6 +48,10 @@ def db_path(tmp_path: Path) -> Path:
         channels.create(
             conn, device_id=did, name="mic_dba", type="display",
             char_uuid=DBA_UUID, data_format="float32_le", unit="dBA",
+        )
+        channels.create(
+            conn, device_id=did, name="vib_rms", type="display",
+            char_uuid=MG_UUID, data_format="float32_le", unit="mg",
         )
     finally:
         conn.close()
@@ -291,3 +296,27 @@ def test_make_feed_dba_channel_emits_plausible_range(db_path: Path) -> None:
     # Must include both quiet baseline and at least one spike tick (tick 30).
     assert min(values) < 45.0, "expected quiet baseline ticks below 45 dB(A)"
     assert max(values) > 60.0, "expected spike tick above 60 dB(A)"
+
+
+def test_make_feed_mg_channel_stays_in_range(db_path: Path) -> None:
+    # VibrationRMS feed must stay within [0, 95] across 60 ticks.
+    ble = MockBLEManager()
+    rt, _ = _runtime(db_path, ble)
+    rt.activate()
+    feed = rt.make_feed()
+    values = [parser.decode(feed(ADDR, MG_UUID), "float32_le") for _ in range(60)]  # type: ignore[arg-type]
+    assert all(0.0 <= v <= 95.0 for v in values), (
+        f"mg feed out of [0, 95] range: min={min(values):.1f} max={max(values):.1f}"
+    )
+
+
+def test_make_feed_mg_channel_has_quiet_and_burst(db_path: Path) -> None:
+    # Feed must produce both a quiet baseline (<10 mg) and burst values (>60 mg)
+    # within 60 ticks so the VibrationAlert-style demo is exercised.
+    ble = MockBLEManager()
+    rt, _ = _runtime(db_path, ble)
+    rt.activate()
+    feed = rt.make_feed()
+    values = [parser.decode(feed(ADDR, MG_UUID), "float32_le") for _ in range(60)]  # type: ignore[arg-type]
+    assert any(v < 10.0 for v in values), "expected quiet baseline ticks below 10 mg"
+    assert any(v > 60.0 for v in values), "expected burst ticks above 60 mg"
