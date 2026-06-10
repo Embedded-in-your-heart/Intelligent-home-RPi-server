@@ -19,6 +19,40 @@ tasks:
     cmds:
       - sudo -E .venv/bin/python3.12 -m home_server
 
+  set-start:
+    desc: "RPi only: install root @reboot crontab to auto-start the server on boot"
+    cmds:
+      - |
+        chmod +x scripts/boot_start.sh
+        ROOT="$(pwd)"
+        BOOT="$ROOT/scripts/boot_start.sh"
+        LOG="$ROOT/data/boot.log"
+        MARKER="# intelligent-home-autostart"
+        LINE="@reboot $BOOT >> $LOG 2>&1 $MARKER"
+        # Capture the existing crontab first, drop any prior autostart line, then
+        # rewrite — avoids reading and writing the crontab in one pipeline.
+        EXISTING="$(sudo crontab -l 2>/dev/null | grep -vF "$MARKER" || true)"
+        if [ -n "$EXISTING" ]; then
+          printf '%s\n%s\n' "$EXISTING" "$LINE" | sudo crontab -
+        else
+          printf '%s\n' "$LINE" | sudo crontab -
+        fi
+        echo "installed: $LINE"
+
+  unset-start:
+    desc: "RPi only: remove the auto-start @reboot crontab entry"
+    cmds:
+      - |
+        MARKER="# intelligent-home-autostart"
+        REMAINING="$(sudo crontab -l 2>/dev/null | grep -vF "$MARKER" || true)"
+        if [ -z "$REMAINING" ]; then
+          sudo crontab -r 2>/dev/null || true
+          echo "removed (crontab now empty)"
+        else
+          echo "$REMAINING" | sudo crontab -
+          echo "removed autostart entry"
+        fi
+
   test:
     desc: Run pytest
     cmds:
