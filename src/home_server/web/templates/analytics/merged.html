@@ -1,0 +1,58 @@
+{% extends "base.html" %}
+{% block title %}合併檢視{% endblock %}
+{% block content %}
+<h1 class="h4 mb-3">合併檢視</h1>
+
+{% if numeric_groups or flag_groups %}
+  <div class="d-flex align-items-center gap-2 mb-3" id="window-selector">
+    <span class="text-muted small">觀測週期</span>
+    <div class="btn-group btn-group-sm" role="group" aria-label="觀測週期">
+      <button type="button" class="btn btn-outline-primary active" data-window="1m">1 分</button>
+      <button type="button" class="btn btn-outline-primary" data-window="10m">10 分</button>
+      <button type="button" class="btn btn-outline-primary" data-window="1h">1 時</button>
+      <button type="button" class="btn btn-outline-primary" data-window="1d">1 天</button>
+      <button type="button" class="btn btn-outline-primary" data-window="1w">1 週</button>
+    </div>
+  </div>
+
+  {% for group in numeric_groups %}
+  <div class="card shadow-sm mb-4">
+    <div class="card-body">
+      <h2 class="card-title h5 mb-2">
+        {{ group.name }} <small class="text-muted">({{ group.unit }})</small>
+      </h2>
+      <canvas data-merged-chart
+              data-unit="{{ group.unit or '' }}"
+              data-channels='{{ group.devices | tojson }}'
+              height="90"></canvas>
+    </div>
+  </div>
+  {% endfor %}
+
+  {% for group in flag_groups %}
+  <div class="card shadow-sm mb-4">
+    <div class="card-body">
+      <h2 class="card-title h5 mb-2">{{ group.name }}</h2>
+      {% for dev in group.devices %}
+      <div class="d-flex align-items-center gap-2 mb-2"
+           data-mflag-channel-id="{{ dev.channelId }}"
+           data-mflag-name="{{ group.name }}"
+           data-device-name="{{ dev.deviceName }}">
+        <span class="flag-led" data-mflag-led></span>
+        <span class="fw-semibold">{{ dev.deviceName }}</span>
+        <span class="fw-semibold" data-mflag-state>—</span>
+        <small class="text-muted" data-mflag-last>載入中…</small>
+      </div>
+      {% endfor %}
+    </div>
+  </div>
+  {% endfor %}
+
+{% else %}
+  <p class="text-muted">No display channels yet. <a href="{{ url_for('devices.list_devices') }}">Add a device</a>.</p>
+{% endif %}
+{% endblock %}
+
+{% block scripts %}
+<script src="{{ url_for('static', filename='js/analytics.js') }}"></script>
+{% endblock %}

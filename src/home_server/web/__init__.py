@@ -113,6 +113,10 @@ def create_app(config: Config, ble: BLEManager | None = None) -> Flask:
 
     app.register_blueprint(channels_bp)
 
+    from home_server.web.analytics import bp as analytics_bp
+
+    app.register_blueprint(analytics_bp)
+
     @app.get("/")
     @login_required
     def index() -> str:
