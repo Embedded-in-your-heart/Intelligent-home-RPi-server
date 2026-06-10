@@ -48,10 +48,18 @@
 <div class="card shadow-sm mb-4">
   <div class="card-body">
     <h2 class="card-title h5 mb-3">Scan for devices</h2>
-    <button class="btn btn-outline-primary mb-3"
-            hx-get="/devices/scan"
-            hx-target="#scan-results"
-            hx-swap="innerHTML">Scan</button>
+    <div class="d-flex align-items-center gap-2 mb-3">
+      <button class="btn btn-outline-primary"
+              hx-get="/devices/scan"
+              hx-target="#scan-results"
+              hx-swap="innerHTML"
+              hx-indicator="#scan-spinner"
+              hx-disabled-elt="this">Scan</button>
+      <span id="scan-spinner" class="htmx-indicator d-flex align-items-center gap-2 text-muted">
+        <span class="spinner-border spinner-border-sm" role="status" aria-hidden="true"></span>
+        <span>Scanning…</span>
+      </span>
+    </div>
     <div id="scan-results"></div>
   </div>
 </div>
