@@ -34,5 +34,5 @@ def parse_enum_unit(unit: str | None) -> dict[int, str] | None:
             key = int(key_str.strip())
         except ValueError:
             continue
-        result[key] = label
+        result[key] = label.strip()
     return result

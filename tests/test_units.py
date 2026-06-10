@@ -34,6 +34,13 @@ def test_single_pair() -> None:
     assert result == {0: "安靜"}
 
 
+def test_whitespace_around_keys_and_labels_is_stripped() -> None:
+    # Hand-typed unit strings often carry stray spaces; they must not leak
+    # into the badge text.
+    result = parse_enum_unit("enum:0= 安靜 , 1 =語音")
+    assert result == {0: "安靜", 1: "語音"}
+
+
 def test_value_with_equals_sign() -> None:
     # Only the first "=" is used as the separator; the rest belong to the label.
     result = parse_enum_unit("enum:0=a=b")
