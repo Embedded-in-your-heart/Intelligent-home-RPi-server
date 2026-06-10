@@ -60,7 +60,26 @@ task fmt             # ruff format
 task typecheck       # mypy strict
 task ci              # lint + typecheck + test
 task scan -- 5       # RPi 限定：BLE 掃描 5 秒
+task set-start       # RPi 限定：安裝開機自動啟動（root crontab @reboot）
+task unset-start     # RPi 限定：移除開機自動啟動
 task clean           # 清除 caches 與 dev SQLite
+```
+
+### 開機自動啟動（RPi）
+
+`task set-start` 會在 **root 的 crontab** 寫入一條帶標記
+（`# intelligent-home-autostart`）的 `@reboot` 項目，開機時執行
+`scripts/boot_start.sh`：載入 `.env` → 重置 `hci0`（`hciconfig down/up`，
+失敗不中斷）→ 用 `.venv` 內的絕對 python 啟動 server。指令可重複執行（冪等），
+`task unset-start` 則精準移除該項目、不影響其他 crontab 條目。
+
+開機輸出（stdout/stderr）會導向 `data/boot.log`。監控與讀取日誌：
+
+```bash
+tail -f data/boot.log            # 即時跟看開機啟動輸出
+tail -n 50 data/boot.log         # 看最近 50 行
+grep -iE "error|traceback" data/boot.log   # 只看錯誤
+sudo crontab -l                  # 確認已安裝的 @reboot 項目
 ```
 
 ## 專案狀態
