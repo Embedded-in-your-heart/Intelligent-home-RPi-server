@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import logging
 
-from flask import Blueprint, abort, current_app, flash, redirect, render_template, url_for
+from flask import Blueprint, abort, current_app, flash, redirect, render_template, request, url_for
 from flask_login import current_user, login_required
 from flask_wtf import FlaskForm
 from werkzeug.wrappers import Response
@@ -89,6 +89,16 @@ def detail(device_id: int) -> str:
 def delete(device_id: int) -> Response:
     try:
         get_device_service().remove_device(get_conn(), device_id)
+    except DeviceNotFoundError:
+        abort(404)
+    return redirect(url_for("devices.list_devices"))
+
+
+@bp.post("/devices/<int:device_id>/label")
+@login_required
+def set_device_label(device_id: int) -> Response:
+    try:
+        get_device_service().set_label(get_conn(), device_id, request.form.get("label", ""))
     except DeviceNotFoundError:
         abort(404)
     return redirect(url_for("devices.list_devices"))

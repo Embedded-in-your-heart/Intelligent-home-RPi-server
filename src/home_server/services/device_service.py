@@ -90,5 +90,15 @@ class DeviceService:
     def list_devices(self, conn: sqlite3.Connection) -> list[Device]:
         return devices.list_all(conn)
 
+    def set_label(
+        self, conn: sqlite3.Connection, device_id: int, label: str
+    ) -> None:
+        """Trim label; store None when empty. Raises DeviceNotFoundError if missing."""
+        normalized: str | None = label.strip() or None
+        device = devices.get_by_id(conn, device_id)
+        if device is None:
+            raise DeviceNotFoundError(f"device not found: id={device_id}")
+        devices.set_label(conn, device_id, normalized)
+
     def is_connected(self, address: str) -> bool:
         return self._ble.is_connected(address)

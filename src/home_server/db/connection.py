@@ -42,6 +42,8 @@ def apply_migrations(conn: sqlite3.Connection) -> None:
         conn.execute(
             "ALTER TABLE devices ADD COLUMN last_connected_at TIMESTAMP"
         )
+    if "label" not in cols:
+        conn.execute("ALTER TABLE devices ADD COLUMN label TEXT")
 
 
 def initialize(db_path: Path) -> None:

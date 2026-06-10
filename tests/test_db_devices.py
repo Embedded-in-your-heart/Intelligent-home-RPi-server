@@ -86,3 +86,49 @@ def test_create_defaults_addr_type_public(db_conn, alice_id) -> None:
     d = devices.get_by_id(db_conn, did)
     assert d is not None
     assert d.addr_type == "public"
+
+
+def test_set_label_updates_label(db_conn, alice_id) -> None:
+    did = devices.create(db_conn, address="aa:bb", name="Sensor", owner_user_id=alice_id)
+    devices.set_label(db_conn, did, "Kitchen Sensor")
+    d = devices.get_by_id(db_conn, did)
+    assert d is not None
+    assert d.label == "Kitchen Sensor"
+
+
+def test_set_label_accepts_none(db_conn, alice_id) -> None:
+    did = devices.create(db_conn, address="aa:bb", name="Sensor", owner_user_id=alice_id)
+    devices.set_label(db_conn, did, "Kitchen Sensor")
+    devices.set_label(db_conn, did, None)
+    d = devices.get_by_id(db_conn, did)
+    assert d is not None
+    assert d.label is None
+
+
+def test_set_label_empty_string(db_conn, alice_id) -> None:
+    did = devices.create(db_conn, address="aa:bb", name="Sensor", owner_user_id=alice_id)
+    devices.set_label(db_conn, did, "")
+    d = devices.get_by_id(db_conn, did)
+    assert d is not None
+    assert d.label == ""
+
+
+def test_set_label_missing_device_raises(db_conn) -> None:
+    with pytest.raises(DeviceNotFoundError):
+        devices.set_label(db_conn, 999, "label")
+
+
+def test_display_name_falls_back_to_name(db_conn, alice_id) -> None:
+    did = devices.create(db_conn, address="aa:bb", name="Sensor", owner_user_id=alice_id)
+    d = devices.get_by_id(db_conn, did)
+    assert d is not None
+    assert d.label is None
+    assert d.display_name == "Sensor"
+
+
+def test_display_name_uses_label_when_set(db_conn, alice_id) -> None:
+    did = devices.create(db_conn, address="aa:bb", name="Sensor", owner_user_id=alice_id)
+    devices.set_label(db_conn, did, "Kitchen Sensor")
+    d = devices.get_by_id(db_conn, did)
+    assert d is not None
+    assert d.display_name == "Kitchen Sensor"

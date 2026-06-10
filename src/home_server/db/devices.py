@@ -20,6 +20,7 @@ class Device:
     address: str
     addr_type: str
     name: str
+    label: str | None
     owner_user_id: int
     last_connected_at: str | None
     created_at: str
@@ -31,10 +32,15 @@ class Device:
             address=row["address"],
             addr_type=row["addr_type"],
             name=row["name"],
+            label=row["label"],
             owner_user_id=row["owner_user_id"],
             last_connected_at=row["last_connected_at"],
             created_at=row["created_at"],
         )
+
+    @property
+    def display_name(self) -> str:
+        return self.label or self.name
 
 
 def create(
@@ -96,3 +102,12 @@ def touch_last_connected(conn: sqlite3.Connection, device_id: int) -> None:
         "UPDATE devices SET last_connected_at = CURRENT_TIMESTAMP WHERE id = ?",
         (device_id,),
     )
+
+
+def set_label(conn: sqlite3.Connection, device_id: int, label: str | None) -> None:
+    """Write label directly; the caller is responsible for normalisation."""
+    cur = conn.execute(
+        "UPDATE devices SET label = ? WHERE id = ?", (label, device_id)
+    )
+    if cur.rowcount == 0:
+        raise DeviceNotFoundError(f"device not found: id={device_id}")
