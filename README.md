@@ -82,6 +82,41 @@ grep -iE "error|traceback" data/boot.log   # 只看錯誤
 sudo crontab -l                  # 確認已安裝的 @reboot 項目
 ```
 
+## 頻道類型
+
+系統支援以下頻道類型與顯示行為：
+
+| 類型 | unit 值 | 介面行為 |
+|------|---------|---------|
+| `display` | 數值單位（如 `°C`、`dBA`、`mg`） | Chart.js 趨勢圖＋現值／最小／最大／平均統計 |
+| `display` | `0/1` | 旗標 LED 燈＋狀態文字＋觸發 toast 通知 |
+| `display` | `enum:0=標籤,1=標籤,...` | 列舉徽章（enum badge），動態對應數值到標籤 |
+| `controller` | `0/1` | 開／關切換器（HTMX 即時送出） |
+| `controller` | 其他 | 泛用文字輸入表單（generic write form） |
+
+### 預設頻道目錄（14 筆）
+
+`data/channel_presets.json` 內建 14 筆預設，對應 STM32 BLE 服務：
+
+| UUID（末段） | 標籤 | 類型 | 單位 |
+|-------------|------|------|------|
+| 1A220002 | 溫度 (°C) | display | °C |
+| 1A220003 | 濕度 (% RH) | display | % RH |
+| 1A220004 | 加速度量值 (g) | display | g |
+| 1A220005 | 陀螺儀量值 (dps) | display | dps |
+| 1A220006 | 異常晃動警示 | display | 0/1 |
+| 1A220007 | 麥克風音量 | display | level (0–1023) |
+| 1A220008 | 大聲警示 | display | 0/1 |
+| 1A22F002 | LED1 開關 | controller | 0/1 |
+| 1A22F003 | 控制旗標 | controller | bitmask |
+| 1A22000A | 警報聲偵測 | display | 0/1 |
+| 1A22000B | 音量 dB(A) | display | dBA |
+| 1A22000C | 震動強度 (mg) | display | mg |
+| 1A22000D | 家電運轉 | display | 0/1 |
+| 1A22000E | 地震警報 | display | 0/1 |
+
+Mock feed 模擬模式：dBA 頻道以正弦波產生浮點數、mg 頻道以隨機值模擬震動、0/1 頻道定期翻轉。
+
 ## 專案狀態
 
 ### ✅ 已完成
@@ -129,9 +164,10 @@ sudo crontab -l                  # 確認已安裝的 @reboot 項目
 **Phase 3e：SocketIO + 前端**
 - Flask-SocketIO（threading 模式），與 bluepy worker thread 串接
 - 監控型頻道即時推播（每個頻道一個 room）
-- Jinja2 + HTMX 模板、Chart.js 歷史趨勢圖
+- Jinja2 + HTMX 模板、Chart.js 歷史趨勢圖＋統計欄位
+- 頻道 widget 共用 Jinja2 macro（`_channel_widget.html`），dashboard 與裝置詳情頁共用同一套渲染邏輯
 
-**測試與品質：** 190 unit tests passing、`ruff check` 與 `mypy src`（strict）全綠。
+**測試與品質：** unit tests passing、`ruff check` 與 `mypy src`（strict）全綠。
 
 ### 🚧 進行中 / 未完成
 
