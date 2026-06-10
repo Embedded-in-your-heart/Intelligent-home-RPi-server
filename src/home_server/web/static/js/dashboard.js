@@ -221,6 +221,47 @@
       sock.emit("subscribe_channel", { channel_id: channelId });
     });
 
+    // Enum state-badge channels: show a labelled badge seeded from /latest.
+    var enums = {};
+    document.querySelectorAll("[data-enum-channel-id]").forEach(function (el) {
+      var channelId = parseInt(el.getAttribute("data-enum-channel-id"), 10);
+      var labels = {};
+      try {
+        labels = JSON.parse(el.getAttribute("data-enum-labels") || "{}");
+      } catch (e) {
+        console.warn("bad data-enum-labels for channel " + channelId, e);
+      }
+      var badgeEl = el.querySelector("[data-enum-state]");
+      var lastEl = el.querySelector("[data-enum-last]");
+
+      function renderEnum(value, timestamp) {
+        var rounded = Math.round(value);
+        var label = labels[rounded] !== undefined ? labels[rounded] : String(value);
+        badgeEl.textContent = label;
+        badgeEl.className = "badge fs-6 " + (rounded === 0 ? "text-bg-secondary" : "text-bg-primary");
+        var ts = formatTs(timestamp);
+        lastEl.textContent = ts ? ts : "";
+      }
+
+      enums[channelId] = { labels: labels, renderEnum: renderEnum };
+
+      fetch("/channels/" + channelId + "/latest")
+        .then(function (r) { return r.json(); })
+        .then(function (j) {
+          if (j.value != null) {
+            renderEnum(j.value, j.timestamp);
+          } else {
+            badgeEl.textContent = "尚無資料";
+            lastEl.textContent = "";
+          }
+        })
+        .catch(function (err) {
+          console.warn("latest fetch failed for channel " + channelId, err);
+        });
+
+      sock.emit("subscribe_channel", { channel_id: channelId });
+    });
+
     sock.on("reading", function (d) {
       var chart = charts[d.channel_id];
       if (chart) {
@@ -248,6 +289,10 @@
         flag.on = nowOn;
         if (nowOn) flag.lastOn = d.timestamp;
         flag.render(d.value, flag.lastOn);
+      }
+      var enumEntry = enums[d.channel_id];
+      if (enumEntry) {
+        enumEntry.renderEnum(d.value, d.timestamp);
       }
     });
   }

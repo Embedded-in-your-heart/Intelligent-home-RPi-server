@@ -488,6 +488,68 @@ def test_flag_requires_login(client: FlaskClient) -> None:
     assert "/auth/login" in resp.headers["Location"]
 
 
+def test_latest_returns_most_recent_reading(
+    app: Flask, logged_in_client: FlaskClient
+) -> None:
+    device_id = _make_device(app, "AA:BB:CC:DD:EE:60", "Sound")
+    conn = connection.connect(app.config["DB_PATH"])
+    try:
+        channel_id = channels.create(
+            conn,
+            device_id=device_id,
+            name="SoundClass",
+            type="display",
+            char_uuid="uuid-sc",
+            data_format="uint8",
+            unit="enum:0=安靜,1=語音",
+        )
+        readings.insert(conn, channel_id=channel_id, value=0.0)
+        readings.insert(conn, channel_id=channel_id, value=1.0)
+    finally:
+        conn.close()
+    resp = logged_in_client.get(f"/channels/{channel_id}/latest")
+    assert resp.status_code == 200
+    body = resp.get_json()
+    assert body["channel_id"] == channel_id
+    assert body["value"] == 1.0
+    assert body["timestamp"] is not None
+
+
+def test_latest_no_readings_returns_nulls(
+    app: Flask, logged_in_client: FlaskClient
+) -> None:
+    device_id = _make_device(app, "AA:BB:CC:DD:EE:61", "Sound2")
+    conn = connection.connect(app.config["DB_PATH"])
+    try:
+        channel_id = channels.create(
+            conn,
+            device_id=device_id,
+            name="MicDB",
+            type="display",
+            char_uuid="uuid-mic",
+            data_format="float32_le",
+            unit="dB",
+        )
+    finally:
+        conn.close()
+    resp = logged_in_client.get(f"/channels/{channel_id}/latest")
+    assert resp.status_code == 200
+    body = resp.get_json()
+    assert body["value"] is None
+    assert body["timestamp"] is None
+
+
+def test_latest_missing_channel_404(logged_in_client: FlaskClient) -> None:
+    resp = logged_in_client.get("/channels/999/latest")
+    assert resp.status_code == 404
+
+
+def test_latest_requires_login(client: FlaskClient) -> None:
+    resp = client.get("/channels/1/latest")
+    assert resp.status_code == 302
+    assert "/auth/login" in resp.headers["Location"]
+
+
 def test_write_channel_requires_login(client: FlaskClient) -> None:
     token = _csrf_token(client, "/auth/login")
     resp = client.post(

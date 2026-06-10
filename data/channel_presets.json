@@ -7,5 +7,8 @@
   {"label": "麥克風音量", "char_uuid": "1A220007-8E22-4541-9D4C-21EDAE82ED19", "type": "display", "data_format": "uint16_le", "unit": "level (0–1023)"},
   {"label": "大聲警示", "char_uuid": "1A220008-8E22-4541-9D4C-21EDAE82ED19", "type": "display", "data_format": "uint8", "unit": "0/1"},
   {"label": "LED1 開關", "char_uuid": "1A22F002-8E22-4541-9D4C-21EDAE82ED19", "type": "controller", "data_format": "uint8", "unit": "0/1"},
-  {"label": "控制旗標", "char_uuid": "1A22F003-8E22-4541-9D4C-21EDAE82ED19", "type": "controller", "data_format": "uint8", "unit": "bitmask"}
+  {"label": "控制旗標", "char_uuid": "1A22F003-8E22-4541-9D4C-21EDAE82ED19", "type": "controller", "data_format": "uint8", "unit": "bitmask"},
+  {"label": "聲音類別", "char_uuid": "1A220009-8E22-4541-9D4C-21EDAE82ED19", "type": "display", "data_format": "uint8", "unit": "enum:0=安靜,1=語音,2=拍手,3=警報,4=其他"},
+  {"label": "警報聲偵測", "char_uuid": "1A22000A-8E22-4541-9D4C-21EDAE82ED19", "type": "display", "data_format": "uint8", "unit": "0/1"},
+  {"label": "音量 dB(A)", "char_uuid": "1A22000B-8E22-4541-9D4C-21EDAE82ED19", "type": "display", "data_format": "float32_le", "unit": "dBA"}
 ]

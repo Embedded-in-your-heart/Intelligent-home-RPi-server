@@ -19,6 +19,7 @@ from home_server.db import devices as db_devices
 from home_server.services.ble_runtime import BleRuntime
 from home_server.services.channel_service import ChannelService
 from home_server.services.device_service import DeviceService
+from home_server.services.units import parse_enum_unit
 from home_server.web.db import get_conn
 from home_server.web.services import (
     BLE_RUNTIME_KEY,
@@ -72,6 +73,8 @@ def create_app(config: Config, ble: BLEManager | None = None) -> Flask:
     from home_server.presets import load_presets
 
     app.config["CHANNEL_PRESETS"] = load_presets(config.channel_presets_path)
+
+    app.jinja_env.globals["parse_enum_unit"] = parse_enum_unit
 
     socketio.init_app(app, async_mode="threading")
 

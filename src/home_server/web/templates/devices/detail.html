@@ -59,6 +59,9 @@
         <span class="fw-semibold" data-flag-state>—</span>
         <small class="text-muted" data-flag-last>載入中…</small>
       </div>
+      {% elif channel.type == "display" and parse_enum_unit(channel.unit) is not none %}
+      {% set enum_labels = parse_enum_unit(channel.unit) %}
+      <div class="d-flex align-items-center gap-2" data-enum-channel-id="{{ channel.id }}" data-enum-labels='{{ enum_labels|tojson }}'><span class="badge text-bg-secondary fs-6" data-enum-state>—</span><small class="text-muted" data-enum-last>載入中…</small></div>
       {% elif channel.type == "display" %}
       <canvas data-channel-id="{{ channel.id }}" data-unit="{{ channel.unit or '' }}" height="80"></canvas>
       {% elif channel.type == "controller" and channel.unit == "0/1" %}
