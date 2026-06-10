@@ -75,6 +75,26 @@ def test_detail_shows_control_form_for_controller(
     assert 'name="value"' in body
 
 
+def test_detail_shows_switch_for_binary_controller(
+    app: Flask, logged_in_client: FlaskClient
+) -> None:
+    device_id = _make_device(app, "AA:BB:CC:DD:EE:43", "Lamp")
+    conn = connection.connect(app.config["DB_PATH"])
+    try:
+        channel_id = channels.create(
+            conn, device_id=device_id, name="LED1", type="controller",
+            char_uuid="uuid-led1", data_format="uint8", unit="0/1",
+        )
+    finally:
+        conn.close()
+    body = logged_in_client.get(f"/devices/{device_id}").get_data(as_text=True)
+    assert f'id="led-switch-{channel_id}"' in body
+    assert "form-switch" in body
+    assert f'hx-post="/channels/{channel_id}/write"' in body
+    # The number input must be gone for a 0/1 controller.
+    assert 'placeholder="value"' not in body
+
+
 def test_list_has_scan_button(logged_in_client: FlaskClient) -> None:
     body = logged_in_client.get("/devices").get_data(as_text=True)
     assert 'hx-get="/devices/scan"' in body

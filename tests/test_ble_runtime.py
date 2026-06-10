@@ -14,6 +14,7 @@ from home_server.services.channel_service import ChannelService
 ADDR = "AA:BB:CC:DD:EE:FF"
 DISP_UUID = "uuid-disp"
 CTRL_UUID = "uuid-ctrl"
+FLAG_UUID = "uuid-flag"
 
 
 @pytest.fixture
@@ -31,6 +32,10 @@ def db_path(tmp_path: Path) -> Path:
         channels.create(
             conn, device_id=did, name="led", type="controller",
             char_uuid=CTRL_UUID, data_format="uint8", unit=None,
+        )
+        channels.create(
+            conn, device_id=did, name="alert", type="display",
+            char_uuid=FLAG_UUID, data_format="uint8", unit="0/1",
         )
     finally:
         conn.close()
@@ -87,6 +92,19 @@ def test_make_feed_encodes_known_channel_and_skips_unknown(db_path: Path) -> Non
     assert data is not None
     assert 0 <= parser.decode(data, "uint8") <= 255
     assert feed("ZZ:ZZ", "nope") is None
+
+
+def test_make_feed_binary_channel_toggles_and_recovers(db_path: Path) -> None:
+    # A 0/1 flag channel must emit both 0 and 1 over time, otherwise the
+    # dashboard flag would trigger and never recover to "normal".
+    ble = MockBLEManager()
+    rt, _ = _runtime(db_path, ble)
+    rt.activate()
+    feed = rt.make_feed()
+    values = {parser.decode(feed(ADDR, FLAG_UUID), "uint8") for _ in range(60)}
+    assert values <= {0.0, 1.0}
+    assert 0.0 in values  # recovers to normal
+    assert 1.0 in values  # still triggers
 
 
 def test_activate_connects_with_device_addr_type(db_path: Path) -> None:

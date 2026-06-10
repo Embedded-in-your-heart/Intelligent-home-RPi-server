@@ -61,6 +61,17 @@
       </div>
       {% elif channel.type == "display" %}
       <canvas data-channel-id="{{ channel.id }}" data-unit="{{ channel.unit or '' }}" height="80"></canvas>
+      {% elif channel.type == "controller" and channel.unit == "0/1" %}
+      <form hx-post="{{ url_for('channels.write_channel', channel_id=channel.id) }}"
+            hx-swap="none"
+            class="form-check form-switch">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+        <input type="hidden" name="value" value="0">
+        <input class="form-check-input" type="checkbox" role="switch"
+               id="led-switch-{{ channel.id }}"
+               onchange="var on=this.checked; this.form.elements.value.value = on ? '1' : '0'; this.nextElementSibling.textContent = on ? '開' : '關'; this.form.requestSubmit();">
+        <label class="form-check-label" for="led-switch-{{ channel.id }}">關</label>
+      </form>
       {% else %}
       <form method="post"
             action="{{ url_for('channels.write_channel', channel_id=channel.id) }}"

@@ -283,14 +283,24 @@ class BleRuntime:
 
     def make_feed(self) -> Callable[[str, str], bytes | None]:
         """Return a format-aware synthetic reading generator for the mock."""
-        state = {"n": 0}
+        analog_n = 0
+        # Per-flag tick counters so each 0/1 channel toggles independently.
+        flag_ticks: dict[str, int] = {}
 
         def feed(address: str, char_uuid: str) -> bytes | None:
+            nonlocal analog_n
             channel = self._subscribed.get((address, char_uuid))
             if channel is None:
                 return None
-            state["n"] += 1
-            value = 25.0 + 5.0 * math.sin(state["n"] / 10.0)
+            if channel.unit == "0/1":
+                # Binary flag: mostly 0 with a brief 1 every 20 ticks, so the
+                # dashboard flag visibly triggers and then recovers to normal.
+                count = flag_ticks.get(char_uuid, 0) + 1
+                flag_ticks[char_uuid] = count
+                value = 1.0 if count % 20 == 0 else 0.0
+            else:
+                analog_n += 1
+                value = 25.0 + 5.0 * math.sin(analog_n / 10.0)
             try:
                 return parser.encode(value, channel.data_format)
             except parser.ParseError:
