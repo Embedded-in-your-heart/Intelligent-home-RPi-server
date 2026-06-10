@@ -1,9 +1,31 @@
 """Rendering checks for the realtime/control frontend."""
 
+import json
+import re
+
 from flask import Flask
 from flask.testing import FlaskClient
 
 from home_server.db import channels, connection, devices, readings
+
+
+def _extract_enum_labels(body: str, channel_id: int) -> dict[str, str] | None:
+    """Return the parsed dict from the data-enum-labels attribute for *channel_id*.
+
+    Searches for the attribute on the element that also carries
+    ``data-enum-channel-id="<channel_id>"``.  Returns ``None`` when the attribute
+    is not found, so callers can assert on the return value directly.
+    """
+    # Match data-enum-labels='...' or data-enum-labels="..."
+    pattern = (
+        r'data-enum-channel-id="'
+        + re.escape(str(channel_id))
+        + r'"[^>]*data-enum-labels=\'([^\']*)\''
+    )
+    m = re.search(pattern, body)
+    if m is None:
+        return None
+    return json.loads(m.group(1))
 
 
 def _make_device(app: Flask, address: str, name: str) -> int:
@@ -188,9 +210,13 @@ def test_detail_shows_enum_widget_for_enum_channel(
     assert f'data-enum-channel-id="{channel_id}"' in body
     assert f'data-channel-id="{channel_id}"' not in body
     assert f'data-flag-channel-id="{channel_id}"' not in body
-    # data-enum-labels JSON must contain all five label strings.
-    for label in ("安靜", "語音", "拍手", "警報", "其他"):
-        assert label in body
+    # data-enum-labels attribute must decode to the exact int-keyed mapping.
+    # Checking the attribute value (not the raw unit cell) catches regressions
+    # in label serialisation — tojson uses ensure_ascii=True so Chinese chars
+    # are unicode-escaped and the old "label in body" loop gave false confidence.
+    labels = _extract_enum_labels(body, channel_id)
+    assert labels is not None, "data-enum-labels attribute not found"
+    assert labels == {"0": "安靜", "1": "語音", "2": "拍手", "3": "警報", "4": "其他"}
 
 
 def test_index_shows_enum_widget_for_enum_channel(
@@ -213,3 +239,7 @@ def test_index_shows_enum_widget_for_enum_channel(
     body = logged_in_client.get("/").get_data(as_text=True)
     assert f'data-enum-channel-id="{channel_id}"' in body
     assert f'data-channel-id="{channel_id}"' not in body
+    # Verify the attribute value itself decodes to the expected mapping.
+    labels = _extract_enum_labels(body, channel_id)
+    assert labels is not None, "data-enum-labels attribute not found"
+    assert labels == {"0": "安靜", "1": "語音"}
