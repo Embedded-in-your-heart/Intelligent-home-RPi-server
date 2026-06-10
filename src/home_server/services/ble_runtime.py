@@ -132,6 +132,23 @@ class BleRuntime:
             return
         self.subscribe_channel(device.address, channel)
 
+    def on_channel_removed(self, device: Device, channel: Channel) -> None:
+        """Tear down the BLE notify subscription for a deleted display channel.
+
+        Removes the ``(address, char_uuid)`` entry from ``_subscribed``
+        unconditionally so the mock feed stops delivering data and the notify
+        closure can be garbage-collected.  The BLE-level ``unsubscribe`` call is
+        only issued when the link is up; the real bluepy backend raises
+        ``ConnectionError`` via ``_require_worker`` if the device is not
+        connected, so we guard with ``is_connected`` — mirroring
+        ``on_channel_added``.
+        """
+        if channel.type != "display":
+            return
+        self._subscribed.pop((device.address, channel.char_uuid), None)
+        if self._ble.is_connected(device.address):
+            self._ble.unsubscribe(device.address, channel.char_uuid)
+
     def subscribe_channel(self, address: str, channel: Channel) -> None:
         """Subscribe one display channel; each notify opens a short-lived conn."""
         channel_id = channel.id

@@ -88,7 +88,11 @@ def delete_channel(channel_id: int) -> Response:
     channel = channels.get_by_id(conn, channel_id)
     if channel is None:
         abort(404)
+    device = devices.get_by_id(conn, channel.device_id)
+    if device is None:
+        abort(404)
     channels.delete(conn, channel_id)
+    get_ble_runtime().on_channel_removed(device, channel)
     return redirect(url_for("devices.detail", device_id=channel.device_id))
 
 

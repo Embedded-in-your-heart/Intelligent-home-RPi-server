@@ -192,6 +192,56 @@ def test_add_channel_unknown_preset_rejected(
         conn.close()
 
 
+def test_delete_channel_unsubscribes_ble_when_connected(
+    app: Flask, logged_in_client: FlaskClient, mock_ble
+) -> None:
+    # When a display channel is deleted while the device link is up, the BLE
+    # notify subscription must be torn down so handle_notify stops being called.
+    address = "AA:BB:CC:DD:EE:10"
+    device_id = _make_device(app, address, "DelBoard")
+    mock_ble.connect(address)
+    conn = connection.connect(app.config["DB_PATH"])
+    try:
+        channel_id = channels.create(
+            conn,
+            device_id=device_id,
+            name="ToDelete",
+            type="display",
+            char_uuid="uuid-temp",
+            data_format="float32_le",
+            unit="°C",
+        )
+    finally:
+        conn.close()
+    # Subscribe via the web route (mirrors add_channel flow) so mock_ble knows
+    # about it, then delete the channel and verify the subscription is gone.
+    token = _csrf_token(logged_in_client, f"/devices/{device_id}")
+    logged_in_client.post(
+        f"/devices/{device_id}/channels",
+        data={"name": "ToDelete2", "preset": "uuid-temp", "csrf_token": token},
+        follow_redirects=True,
+    )
+    # Manually subscribe so the mock tracks it (channel created directly above
+    # bypassed on_channel_added).
+    mock_ble._subscriptions[(address, "uuid-temp")] = lambda _: None
+    token = _csrf_token(logged_in_client, f"/devices/{device_id}")
+    resp = logged_in_client.post(
+        f"/channels/{channel_id}/delete",
+        data={"csrf_token": token},
+        follow_redirects=True,
+    )
+    assert resp.status_code == 200
+    # Subscription must be removed from mock_ble after delete.
+    assert (address, "uuid-temp") not in mock_ble._subscriptions
+    # Channel must be gone from the DB.
+    conn = connection.connect(app.config["DB_PATH"])
+    try:
+        remaining = channels.list_by_device(conn, device_id)
+    finally:
+        conn.close()
+    assert all(ch.id != channel_id for ch in remaining)
+
+
 def test_delete_channel_removes_it(app: Flask, logged_in_client: FlaskClient) -> None:
     device_id = _make_device(app, "AA:BB:CC:DD:EE:08", "B3")
     conn = connection.connect(app.config["DB_PATH"])

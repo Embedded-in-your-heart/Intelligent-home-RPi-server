@@ -144,6 +144,59 @@ def test_on_channel_added_ignores_controller_and_disconnected(db_path: Path) -> 
     rt.on_channel_added(device, disp)  # no exception while link is down
 
 
+def test_on_channel_removed_unsubscribes_display_while_connected(db_path: Path) -> None:
+    ble = MockBLEManager()
+    rt, _ = _runtime(db_path, ble)
+    rt.activate()
+    conn = connection.connect(db_path)
+    try:
+        device = devices.list_all(conn)[0]
+        disp = next(c for c in channels.list_by_device(conn, device.id) if c.char_uuid == DISP_UUID)
+    finally:
+        conn.close()
+    assert (ADDR, DISP_UUID) in rt._subscribed
+    rt.on_channel_removed(device, disp)
+    # Entry must be gone from _subscribed
+    assert (ADDR, DISP_UUID) not in rt._subscribed
+    # BLE-level subscription must have been torn down
+    with pytest.raises(MockBLEError):
+        ble.simulate_notify(ADDR, DISP_UUID, b"\x2a")
+
+
+def test_on_channel_removed_ignores_controller_channel(db_path: Path) -> None:
+    ble = MockBLEManager()
+    rt, _ = _runtime(db_path, ble)
+    rt.activate()
+    conn = connection.connect(db_path)
+    try:
+        device = devices.list_all(conn)[0]
+        ctrl = next(c for c in channels.list_by_device(conn, device.id) if c.char_uuid == CTRL_UUID)
+    finally:
+        conn.close()
+    # controller channel was never subscribed; calling on_channel_removed is a no-op
+    rt.on_channel_removed(device, ctrl)
+    # display channel must still be subscribed
+    assert (ADDR, DISP_UUID) in rt._subscribed
+
+
+def test_on_channel_removed_removes_subscribed_entry_when_disconnected(db_path: Path) -> None:
+    ble = MockBLEManager()
+    rt, _ = _runtime(db_path, ble)
+    rt.activate()
+    conn = connection.connect(db_path)
+    try:
+        device = devices.list_all(conn)[0]
+        disp = next(c for c in channels.list_by_device(conn, device.id) if c.char_uuid == DISP_UUID)
+    finally:
+        conn.close()
+    ble.disconnect(ADDR)
+    assert not ble.is_connected(ADDR)
+    assert (ADDR, DISP_UUID) in rt._subscribed
+    # Must not raise even though the link is down
+    rt.on_channel_removed(device, disp)
+    assert (ADDR, DISP_UUID) not in rt._subscribed
+
+
 def test_scan_window_drops_connections_to_free_the_adapter(db_path: Path) -> None:
     # bluepy cannot reliably scan while peripherals are connected on the same
     # adapter, so scan_window() must disconnect every live link for its body.
