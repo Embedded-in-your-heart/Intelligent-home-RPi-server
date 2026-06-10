@@ -21,6 +21,7 @@ class Device:
     addr_type: str
     name: str
     owner_user_id: int
+    last_connected_at: str | None
     created_at: str
 
     @classmethod
@@ -31,6 +32,7 @@ class Device:
             addr_type=row["addr_type"],
             name=row["name"],
             owner_user_id=row["owner_user_id"],
+            last_connected_at=row["last_connected_at"],
             created_at=row["created_at"],
         )
 
@@ -86,3 +88,11 @@ def delete(conn: sqlite3.Connection, device_id: int) -> None:
     cur = conn.execute("DELETE FROM devices WHERE id = ?", (device_id,))
     if cur.rowcount == 0:
         raise DeviceNotFoundError(f"device not found: id={device_id}")
+
+
+def touch_last_connected(conn: sqlite3.Connection, device_id: int) -> None:
+    """Set last_connected_at to now. Called on status transitions to/from connected."""
+    conn.execute(
+        "UPDATE devices SET last_connected_at = CURRENT_TIMESTAMP WHERE id = ?",
+        (device_id,),
+    )

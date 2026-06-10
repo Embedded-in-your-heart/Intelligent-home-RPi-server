@@ -51,8 +51,13 @@ def list_devices() -> Response | str:
             flash("Address already exists")
         else:
             return redirect(url_for("devices.list_devices"))
-    items = get_device_service().list_devices(get_conn())
-    return render_template("devices/list.html", devices=items, form=form)
+    svc = get_device_service()
+    items = svc.list_devices(get_conn())
+    statuses = {
+        d.id: "connected" if svc.is_connected(d.address) else "disconnected"
+        for d in items
+    }
+    return render_template("devices/list.html", devices=items, statuses=statuses, form=form)
 
 
 @bp.get("/devices/<int:device_id>")

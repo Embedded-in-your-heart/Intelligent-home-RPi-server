@@ -38,6 +38,10 @@ def apply_migrations(conn: sqlite3.Connection) -> None:
                 "UPDATE devices SET addr_type = ? WHERE id = ?",
                 (infer_addr_type(row["address"]), row["id"]),
             )
+    if "last_connected_at" not in cols:
+        conn.execute(
+            "ALTER TABLE devices ADD COLUMN last_connected_at TIMESTAMP"
+        )
 
 
 def initialize(db_path: Path) -> None:

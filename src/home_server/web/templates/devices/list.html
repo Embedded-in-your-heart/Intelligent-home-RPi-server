@@ -7,13 +7,18 @@
     {% if devices %}
     <table class="table table-sm align-middle">
       <thead>
-        <tr><th>Name</th><th>Address</th><th>Created</th><th></th></tr>
+        <tr><th>Name</th><th>Address</th><th>Status</th><th>Last seen</th><th>Created</th><th></th></tr>
       </thead>
       <tbody>
         {% for device in devices %}
         <tr>
           <td><a href="{{ url_for('devices.detail', device_id=device.id) }}">{{ device.name }}</a></td>
           <td><code>{{ device.address }}</code></td>
+          <td>
+            <span class="badge {{ {'connected':'bg-success','reconnecting':'bg-warning','disconnected':'bg-secondary'}.get(statuses[device.id], 'bg-secondary') }}"
+                  data-device-id="{{ device.id }}">{{ statuses[device.id] }}</span>
+          </td>
+          <td>{{ device.last_connected_at or '—' }}</td>
           <td>{{ device.created_at }}</td>
           <td class="text-end">
             <form method="post"

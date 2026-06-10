@@ -203,7 +203,10 @@ class BleRuntime:
                 # Link is down: the next connect must re-subscribe.
                 state.subscribed = False
                 if state.last_status in (None, STATUS_CONNECTED):
-                    # Just observed a drop: announce it, schedule first retry.
+                    # Just observed a drop: record last-online moment (only if
+                    # it was truly connected, not None at startup), then announce.
+                    if state.last_status == STATUS_CONNECTED:
+                        devices.touch_last_connected(conn, device.id)
                     state.backoff_s = _RECONNECT_BASE_S
                     state.next_retry_at = now + state.backoff_s
                     self._set_status(device.id, state, STATUS_DISCONNECTED)
@@ -234,6 +237,9 @@ class BleRuntime:
             state.subscribed = True
         state.backoff_s = _RECONNECT_BASE_S
         state.next_retry_at = 0.0
+        # Record last-online moment on the transition into connected.
+        if state.last_status != STATUS_CONNECTED:
+            devices.touch_last_connected(conn, device.id)
         self._set_status(device.id, state, STATUS_CONNECTED)
 
     def _set_status(
