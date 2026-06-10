@@ -157,6 +157,24 @@ def channel_history(channel_id: int) -> Response:
     )
 
 
+@bp.get("/channels/<int:channel_id>/latest")
+@login_required
+def channel_latest(channel_id: int) -> Response:
+    """Most recent reading for any channel (value and ISO timestamp, or nulls)."""
+    conn = get_conn()
+    channel = channels.get_by_id(conn, channel_id)
+    if channel is None:
+        abort(404)
+    latest = get_channel_service().get_latest(conn, channel_id)
+    return jsonify(
+        {
+            "channel_id": channel_id,
+            "value": latest.value if latest else None,
+            "timestamp": latest.recorded_at if latest else None,
+        }
+    )
+
+
 @bp.get("/channels/<int:channel_id>/flag")
 @login_required
 def channel_flag(channel_id: int) -> Response:

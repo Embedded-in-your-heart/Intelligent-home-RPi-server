@@ -164,3 +164,52 @@ def test_index_shows_device_status_badge(
     device_id = _make_device(app, "AA:BB:CC:DD:EE:52", "Sensor4")
     body = logged_in_client.get("/").get_data(as_text=True)
     assert f'data-device-id="{device_id}"' in body
+
+
+def test_detail_shows_enum_widget_for_enum_channel(
+    app: Flask, logged_in_client: FlaskClient
+) -> None:
+    device_id = _make_device(app, "AA:BB:CC:DD:EE:60", "Sound")
+    conn = connection.connect(app.config["DB_PATH"])
+    try:
+        channel_id = channels.create(
+            conn,
+            device_id=device_id,
+            name="SoundClass",
+            type="display",
+            char_uuid="uuid-sound-class",
+            data_format="uint8",
+            unit="enum:0=安靜,1=語音,2=拍手,3=警報,4=其他",
+        )
+    finally:
+        conn.close()
+    body = logged_in_client.get(f"/devices/{device_id}").get_data(as_text=True)
+    # Enum widget must be present; chart and flag widgets must be absent.
+    assert f'data-enum-channel-id="{channel_id}"' in body
+    assert f'data-channel-id="{channel_id}"' not in body
+    assert f'data-flag-channel-id="{channel_id}"' not in body
+    # data-enum-labels JSON must contain all five label strings.
+    for label in ("安靜", "語音", "拍手", "警報", "其他"):
+        assert label in body
+
+
+def test_index_shows_enum_widget_for_enum_channel(
+    app: Flask, logged_in_client: FlaskClient
+) -> None:
+    device_id = _make_device(app, "AA:BB:CC:DD:EE:61", "Sound2")
+    conn = connection.connect(app.config["DB_PATH"])
+    try:
+        channel_id = channels.create(
+            conn,
+            device_id=device_id,
+            name="SoundClass",
+            type="display",
+            char_uuid="uuid-sound-class-2",
+            data_format="uint8",
+            unit="enum:0=安靜,1=語音",
+        )
+    finally:
+        conn.close()
+    body = logged_in_client.get("/").get_data(as_text=True)
+    assert f'data-enum-channel-id="{channel_id}"' in body
+    assert f'data-channel-id="{channel_id}"' not in body

@@ -208,6 +208,12 @@ class ChannelService:
                 states[ch.id] = latest is not None and latest.value >= _FLAG_ON_THRESHOLD
         return states
 
+    def get_latest(
+        self, conn: sqlite3.Connection, channel_id: int
+    ) -> Reading | None:
+        """Return the most recent reading for a channel, or None if absent."""
+        return readings.latest_by_channel(conn, channel_id)
+
     def list_by_device(
         self, conn: sqlite3.Connection, device_id: int
     ) -> list[Channel]:
