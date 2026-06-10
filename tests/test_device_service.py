@@ -17,7 +17,7 @@ def owner(db_conn) -> int:
 def test_scan_returns_devices(db_conn) -> None:
     mock = MockBLEManager(scan_results=[DiscoveredDevice(ADDR, "HOME-STM32", -50)])
     svc = DeviceService(mock)
-    found = svc.scan(5.0)
+    found = svc.scan(db_conn, 5.0)
     assert found == [DiscoveredDevice(ADDR, "HOME-STM32", -50)]
     assert mock.scan_calls == [5.0]
 
@@ -32,8 +32,35 @@ def test_scan_filters_out_non_home_and_unnamed(db_conn) -> None:
         ]
     )
     svc = DeviceService(mock)
-    found = svc.scan(5.0)
+    found = svc.scan(db_conn, 5.0)
     assert [d.name for d in found] == ["HOME-Light"]
+
+
+def test_scan_excludes_already_registered_devices(db_conn, owner) -> None:
+    new_addr = "AA:BB:CC:DD:EE:10"
+    registered_addr = "AA:BB:CC:DD:EE:20"
+    mock = MockBLEManager(
+        scan_results=[
+            DiscoveredDevice(new_addr, "HOME-New", -40),
+            DiscoveredDevice(registered_addr, "HOME-Old", -50),
+        ]
+    )
+    svc = DeviceService(mock)
+    svc.add_device(db_conn, owner_user_id=owner, address=registered_addr, name="Old")
+    found = svc.scan(db_conn, 5.0)
+    assert [d.address for d in found] == [new_addr]
+
+
+def test_scan_excludes_registered_address_case_insensitively(db_conn, owner) -> None:
+    # bluepy reports addresses lowercase; a device added manually may be stored
+    # uppercase. The exclusion must match regardless of case.
+    mock = MockBLEManager(
+        scan_results=[DiscoveredDevice("aa:bb:cc:dd:ee:ff", "HOME-X", -40)]
+    )
+    svc = DeviceService(mock)
+    svc.add_device(db_conn, owner_user_id=owner, address="AA:BB:CC:DD:EE:FF", name="X")
+    found = svc.scan(db_conn, 5.0)
+    assert found == []
 
 
 def test_add_device_persists_and_connects(db_conn, owner) -> None:
@@ -133,7 +160,7 @@ def test_add_device_uses_explicit_addr_type(db_conn, owner) -> None:
     assert mock.connect_calls == [(RANDOM_ADDR, "public")]
 
 
-def test_scan_default_prefix_filters_home_prefix() -> None:
+def test_scan_default_prefix_filters_home_prefix(db_conn) -> None:
     # Default prefix "HOME-" keeps only matching devices (existing behaviour).
     mock = MockBLEManager(
         scan_results=[
@@ -143,11 +170,11 @@ def test_scan_default_prefix_filters_home_prefix() -> None:
         ]
     )
     svc = DeviceService(mock)
-    found = svc.scan(5.0)
+    found = svc.scan(db_conn, 5.0)
     assert [d.name for d in found] == ["HOME-Sensor"]
 
 
-def test_scan_custom_prefix_filters_by_that_prefix() -> None:
+def test_scan_custom_prefix_filters_by_that_prefix(db_conn) -> None:
     mock = MockBLEManager(
         scan_results=[
             DiscoveredDevice("AA:BB:CC:DD:EE:01", "DEV-Alpha", -40),
@@ -156,11 +183,11 @@ def test_scan_custom_prefix_filters_by_that_prefix() -> None:
         ]
     )
     svc = DeviceService(mock, scan_name_prefix="DEV-")
-    found = svc.scan(5.0)
+    found = svc.scan(db_conn, 5.0)
     assert [d.name for d in found] == ["DEV-Alpha"]
 
 
-def test_scan_empty_prefix_surfaces_all_named_devices() -> None:
+def test_scan_empty_prefix_surfaces_all_named_devices(db_conn) -> None:
     # Empty prefix disables prefix filtering; unnamed devices are still excluded.
     mock = MockBLEManager(
         scan_results=[
@@ -170,7 +197,7 @@ def test_scan_empty_prefix_surfaces_all_named_devices() -> None:
         ]
     )
     svc = DeviceService(mock, scan_name_prefix="")
-    found = svc.scan(5.0)
+    found = svc.scan(db_conn, 5.0)
     assert [d.name for d in found] == ["HOME-Sensor", "AnyName"]
 
 

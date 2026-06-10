@@ -115,7 +115,7 @@ def scan() -> str:
     # an unhandled 500.
     try:
         with get_ble_runtime().scan_window():
-            found = get_device_service().scan(duration)
+            found = get_device_service().scan(get_conn(), duration)
     except Exception:
         log.warning("BLE scan failed", exc_info=True)
         return render_template("devices/_scan_results.html", found=[], scan_error=True)

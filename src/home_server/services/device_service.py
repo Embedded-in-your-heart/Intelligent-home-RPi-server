@@ -31,14 +31,23 @@ class DeviceService:
         self._ble = ble
         self._scan_name_prefix = scan_name_prefix
 
-    def scan(self, duration_s: float) -> list[DiscoveredDevice]:
+    def scan(
+        self, conn: sqlite3.Connection, duration_s: float
+    ) -> list[DiscoveredDevice]:
         found = self._ble.start_scan(duration_s)
+        # Already-registered devices keep advertising (scan_window drops their
+        # live links for the scan), so exclude them: scan only surfaces NEW,
+        # addable devices. Compare case-insensitively — bluepy reports addresses
+        # lowercase, but a manually added device may be stored uppercase.
+        registered = {d.address.lower() for d in devices.list_all(conn)}
         # name is not None guard always applies; startswith("") is True for all strings,
         # so an empty prefix effectively disables prefix filtering (keeps all named devices).
         return [
             d
             for d in found
-            if d.name is not None and d.name.startswith(self._scan_name_prefix)
+            if d.name is not None
+            and d.name.startswith(self._scan_name_prefix)
+            and d.address.lower() not in registered
         ]
 
     def add_device(
