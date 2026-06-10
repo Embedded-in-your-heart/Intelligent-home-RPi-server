@@ -7,7 +7,11 @@ from home_server.ble.mock_manager import MockBLEManager
 from home_server.ble.rate_limiter import RateLimiter
 from home_server.db import devices, readings, users
 from home_server.db.channels import ChannelNotFoundError
-from home_server.services.channel_service import ChannelService, WrongChannelTypeError
+from home_server.services.channel_service import (
+    ChannelService,
+    DuplicateChannelUuidError,
+    WrongChannelTypeError,
+)
 
 ADDR = "AA:BB:CC:DD:EE:FF"
 CTRL_UUID = "0000aaaa-0000-1000-8000-00805f9b34fb"
@@ -47,6 +51,27 @@ def test_add_channel_rejects_unknown_format(db_conn, device_id) -> None:
             type="display",
             char_uuid=DISP_UUID,
             data_format="nonsense",
+        )
+
+
+def test_add_channel_rejects_duplicate_uuid_on_same_device(db_conn, device_id) -> None:
+    svc, _ = _make_service()
+    svc.add_channel(
+        db_conn,
+        device_id=device_id,
+        name="temp",
+        type="display",
+        char_uuid=DISP_UUID,
+        data_format="uint8",
+    )
+    with pytest.raises(DuplicateChannelUuidError):
+        svc.add_channel(
+            db_conn,
+            device_id=device_id,
+            name="temp2",
+            type="display",
+            char_uuid=DISP_UUID,
+            data_format="uint8",
         )
 
 

@@ -1,4 +1,5 @@
 import re
+import struct
 
 from flask import Flask
 from flask.testing import FlaskClient
@@ -48,6 +49,32 @@ def test_add_channel_appears_on_detail(
     assert ch.unit == "°C"
 
 
+def test_add_channel_subscribes_immediately_when_device_connected(
+    app: Flask, logged_in_client: FlaskClient, mock_ble
+) -> None:
+    # Adding a display channel while the device link is already up must
+    # subscribe right away — without this, data only flows after the STM32
+    # resets and the reconnect monitor re-subscribes.
+    address = "AA:BB:CC:DD:EE:0A"
+    device_id = _make_device(app, address, "LiveBoard")
+    mock_ble.connect(address)
+    token = _csrf_token(logged_in_client, f"/devices/{device_id}")
+    resp = logged_in_client.post(
+        f"/devices/{device_id}/channels",
+        data={"name": "Temp", "preset": "uuid-temp", "csrf_token": token},
+        follow_redirects=True,
+    )
+    assert resp.status_code == 200
+    mock_ble.simulate_notify(address, "uuid-temp", struct.pack("<f", 21.5))
+    conn = connection.connect(app.config["DB_PATH"])
+    try:
+        channel = channels.list_by_device(conn, device_id)[0]
+        rows = readings.list_by_channel(conn, channel.id)
+    finally:
+        conn.close()
+    assert [r.value for r in rows] == [21.5]
+
+
 def test_add_channel_duplicate_name_flashes(
     app: Flask, logged_in_client: FlaskClient
 ) -> None:
@@ -72,6 +99,69 @@ def test_add_channel_duplicate_name_flashes(
     )
     assert resp.status_code == 200
     assert b"Channel name already exists" in resp.data
+
+
+def test_add_channel_duplicate_uuid_flashes(
+    app: Flask, logged_in_client: FlaskClient
+) -> None:
+    device_id = _make_device(app, "AA:BB:CC:DD:EE:0B", "DupUuid")
+    token = _csrf_token(logged_in_client, f"/devices/{device_id}")
+    resp = logged_in_client.post(
+        f"/devices/{device_id}/channels",
+        data={"name": "T1", "preset": "uuid-temp", "csrf_token": token},
+        follow_redirects=True,
+    )
+    assert resp.status_code == 200
+    token = _csrf_token(logged_in_client, f"/devices/{device_id}")
+    resp = logged_in_client.post(
+        f"/devices/{device_id}/channels",
+        data={"name": "T2", "preset": "uuid-temp", "csrf_token": token},
+    )
+    assert resp.status_code == 200
+    assert b"This function is already added on this device" in resp.data
+    conn = connection.connect(app.config["DB_PATH"])
+    try:
+        assert len(channels.list_by_device(conn, device_id)) == 1
+    finally:
+        conn.close()
+
+
+def test_detail_dropdown_hides_used_presets(
+    app: Flask, logged_in_client: FlaskClient
+) -> None:
+    device_id = _make_device(app, "AA:BB:CC:DD:EE:0C", "Filtered")
+    conn = connection.connect(app.config["DB_PATH"])
+    try:
+        channels.create(
+            conn, device_id=device_id, name="Temp", type="display",
+            char_uuid="uuid-temp", data_format="float32_le", unit="°C",
+        )
+    finally:
+        conn.close()
+    html = logged_in_client.get(f"/devices/{device_id}").get_data(as_text=True)
+    assert 'value="uuid-temp"' not in html
+    assert 'value="uuid-led"' in html
+
+
+def test_detail_all_presets_used_shows_message(
+    app: Flask, logged_in_client: FlaskClient
+) -> None:
+    device_id = _make_device(app, "AA:BB:CC:DD:EE:0D", "Full")
+    conn = connection.connect(app.config["DB_PATH"])
+    try:
+        channels.create(
+            conn, device_id=device_id, name="Temp", type="display",
+            char_uuid="uuid-temp", data_format="float32_le", unit="°C",
+        )
+        channels.create(
+            conn, device_id=device_id, name="LED", type="controller",
+            char_uuid="uuid-led", data_format="uint8", unit=None,
+        )
+    finally:
+        conn.close()
+    html = logged_in_client.get(f"/devices/{device_id}").get_data(as_text=True)
+    assert 'id="channel-preset"' not in html
+    assert "所有功能皆已新增" in html
 
 
 def test_add_channel_device_not_found(logged_in_client: FlaskClient) -> None:

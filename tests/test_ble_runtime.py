@@ -97,6 +97,53 @@ def test_activate_connects_with_device_addr_type(db_path: Path) -> None:
     assert ble.connect_calls == [(ADDR, "public")]
 
 
+def test_on_channel_added_subscribes_display_on_live_link(db_path: Path) -> None:
+    ble = MockBLEManager()
+    rt, seen = _runtime(db_path, ble)
+    rt.activate()
+    conn = connection.connect(db_path)
+    try:
+        device = devices.list_all(conn)[0]
+        cid = channels.create(
+            conn, device_id=device.id, name="hum", type="display",
+            char_uuid="uuid-hum", data_format="uint8", unit=None,
+        )
+        channel = channels.get_by_id(conn, cid)
+    finally:
+        conn.close()
+    assert channel is not None
+    rt.on_channel_added(device, channel)
+    ble.simulate_notify(ADDR, "uuid-hum", b"\x07")  # no error
+    assert seen and seen[-1][1] == 7.0
+
+
+def test_on_channel_added_ignores_controller_and_disconnected(db_path: Path) -> None:
+    ble = MockBLEManager()
+    rt, _ = _runtime(db_path, ble)
+    rt.activate()
+    conn = connection.connect(db_path)
+    try:
+        device = devices.list_all(conn)[0]
+        cid = channels.create(
+            conn, device_id=device.id, name="fan", type="controller",
+            char_uuid="uuid-fan", data_format="uint8", unit=None,
+        )
+        ctrl = channels.get_by_id(conn, cid)
+        cid = channels.create(
+            conn, device_id=device.id, name="hum", type="display",
+            char_uuid="uuid-hum", data_format="uint8", unit=None,
+        )
+        disp = channels.get_by_id(conn, cid)
+    finally:
+        conn.close()
+    assert ctrl is not None and disp is not None
+    rt.on_channel_added(device, ctrl)
+    with pytest.raises(MockBLEError):
+        ble.simulate_notify(ADDR, "uuid-fan", b"\x01")
+    ble.disconnect(ADDR)
+    rt.on_channel_added(device, disp)  # no exception while link is down
+
+
 def test_scan_window_drops_connections_to_free_the_adapter(db_path: Path) -> None:
     # bluepy cannot reliably scan while peripherals are connected on the same
     # adapter, so scan_window() must disconnect every live link for its body.

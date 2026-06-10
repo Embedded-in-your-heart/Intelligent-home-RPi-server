@@ -14,7 +14,7 @@ from dataclasses import dataclass
 from pathlib import Path
 
 from home_server.ble import parser
-from home_server.db.channels import ChannelType
+from home_server.db.channels import Channel, ChannelType
 
 _VALID_TYPES: tuple[ChannelType, ...] = ("controller", "display")
 
@@ -30,6 +30,14 @@ class ChannelPreset:
     type: ChannelType
     data_format: str
     unit: str | None
+
+
+def available_presets(
+    presets: list[ChannelPreset], existing: list[Channel]
+) -> list[ChannelPreset]:
+    """Presets not yet used on a device (each char_uuid can be added once)."""
+    used = {c.char_uuid for c in existing}
+    return [p for p in presets if p.char_uuid not in used]
 
 
 def load_presets(path: Path) -> list[ChannelPreset]:

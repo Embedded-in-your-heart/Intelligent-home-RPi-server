@@ -113,6 +113,8 @@
         fill();
       })();
     </script>
+    {% elif presets_exhausted %}
+    <p class="text-muted mb-0">所有功能皆已新增。</p>
     {% else %}
     <p class="text-muted mb-0">尚未設定任何功能，請編輯 <code>data/channel_presets.json</code>。</p>
     {% endif %}

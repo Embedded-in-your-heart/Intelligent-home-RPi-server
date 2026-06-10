@@ -30,6 +30,10 @@ class WrongChannelTypeError(ValueError):
     pass
 
 
+class DuplicateChannelUuidError(ValueError):
+    pass
+
+
 class ChannelService:
     def __init__(
         self,
@@ -54,6 +58,12 @@ class ChannelService:
     ) -> Channel:
         if data_format not in parser.supported_formats():
             raise parser.UnknownFormatError(f"unknown data_format: {data_format!r}")
+        if any(
+            c.char_uuid == char_uuid for c in channels.list_by_device(conn, device_id)
+        ):
+            raise DuplicateChannelUuidError(
+                f"char_uuid {char_uuid!r} already exists on device {device_id}"
+            )
         channel_id = channels.create(
             conn,
             device_id=device_id,

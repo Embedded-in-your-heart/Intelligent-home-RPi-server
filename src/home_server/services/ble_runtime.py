@@ -119,6 +119,19 @@ class BleRuntime:
             if channel.type == "display":
                 self.subscribe_channel(device.address, channel)
 
+    def on_channel_added(self, device: Device, channel: Channel) -> None:
+        """Subscribe a freshly created display channel on an already-live link.
+
+        Without this, a channel added while the device is connected only gets
+        subscribed after the link drops and the monitor re-subscribes (i.e.
+        after a device reset).
+        """
+        if channel.type != "display":
+            return
+        if not self._ble.is_connected(device.address):
+            return
+        self.subscribe_channel(device.address, channel)
+
     def subscribe_channel(self, address: str, channel: Channel) -> None:
         """Subscribe one display channel; each notify opens a short-lived conn."""
         channel_id = channel.id

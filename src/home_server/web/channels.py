@@ -22,9 +22,13 @@ from wtforms.validators import DataRequired
 from home_server.ble import parser
 from home_server.db import channels, devices
 from home_server.db.channels import DuplicateChannelNameError
-from home_server.services.channel_service import WrongChannelTypeError
+from home_server.presets import available_presets
+from home_server.services.channel_service import (
+    DuplicateChannelUuidError,
+    WrongChannelTypeError,
+)
 from home_server.web.db import get_conn
-from home_server.web.services import get_channel_service
+from home_server.web.services import get_ble_runtime, get_channel_service
 
 bp = Blueprint("channels", __name__)
 
@@ -50,7 +54,7 @@ def add_channel(device_id: int) -> Response | str:
             flash("Unknown channel function")
         else:
             try:
-                get_channel_service().add_channel(
+                channel = get_channel_service().add_channel(
                     conn,
                     device_id=device_id,
                     name=form.name.data,
@@ -61,14 +65,19 @@ def add_channel(device_id: int) -> Response | str:
                 )
             except DuplicateChannelNameError:
                 flash("Channel name already exists on this device")
+            except DuplicateChannelUuidError:
+                flash("This function is already added on this device")
             else:
+                get_ble_runtime().on_channel_added(device, channel)
                 return redirect(url_for("devices.detail", device_id=device_id))
     device_channels = channels.list_by_device(conn, device_id)
+    avail = available_presets(presets, device_channels)
     return render_template(
         "devices/detail.html",
         device=device,
         channels=device_channels,
-        presets=presets,
+        presets=avail,
+        presets_exhausted=bool(presets) and not avail,
     )
 
 

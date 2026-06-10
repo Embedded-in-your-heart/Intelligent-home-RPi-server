@@ -13,6 +13,7 @@ from wtforms.validators import DataRequired
 
 from home_server.db import devices
 from home_server.db.devices import DeviceNotFoundError, DuplicateAddressError
+from home_server.presets import available_presets
 from home_server.services.device_service import InvalidAddressError
 from home_server.web.db import get_conn
 from home_server.web.services import (
@@ -71,11 +72,14 @@ def detail(device_id: int) -> str:
     status = (
         "connected" if get_device_service().is_connected(device.address) else "disconnected"
     )
+    presets = current_app.config["CHANNEL_PRESETS"]
+    avail = available_presets(presets, device_channels)
     return render_template(
         "devices/detail.html",
         device=device,
         channels=device_channels,
-        presets=current_app.config["CHANNEL_PRESETS"],
+        presets=avail,
+        presets_exhausted=bool(presets) and not avail,
         device_status=status,
     )
 

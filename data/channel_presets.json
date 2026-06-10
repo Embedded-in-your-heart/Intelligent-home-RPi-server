@@ -3,9 +3,9 @@
   {"label": "濕度 (% RH)", "char_uuid": "1A220003-8E22-4541-9D4C-21EDAE82ED19", "type": "display", "data_format": "float32_le", "unit": "% RH"},
   {"label": "加速度量值 (g)", "char_uuid": "1A220004-8E22-4541-9D4C-21EDAE82ED19", "type": "display", "data_format": "float32_le", "unit": "g"},
   {"label": "陀螺儀量值 (dps)", "char_uuid": "1A220005-8E22-4541-9D4C-21EDAE82ED19", "type": "display", "data_format": "float32_le", "unit": "dps"},
-  {"label": "異常晃動警示", "char_uuid": "1A220006-8E22-4541-9D4C-21EDAE82ED19", "type": "display", "data_format": "uint8"},
-  {"label": "麥克風音量", "char_uuid": "1A220007-8E22-4541-9D4C-21EDAE82ED19", "type": "display", "data_format": "uint16_le"},
-  {"label": "大聲警示", "char_uuid": "1A220008-8E22-4541-9D4C-21EDAE82ED19", "type": "display", "data_format": "uint8"},
-  {"label": "LED1 開關", "char_uuid": "1A22F002-8E22-4541-9D4C-21EDAE82ED19", "type": "controller", "data_format": "uint8"},
-  {"label": "控制旗標", "char_uuid": "1A22F003-8E22-4541-9D4C-21EDAE82ED19", "type": "controller", "data_format": "uint8"}
+  {"label": "異常晃動警示", "char_uuid": "1A220006-8E22-4541-9D4C-21EDAE82ED19", "type": "display", "data_format": "uint8", "unit": "0/1"},
+  {"label": "麥克風音量", "char_uuid": "1A220007-8E22-4541-9D4C-21EDAE82ED19", "type": "display", "data_format": "uint16_le", "unit": "level (0–1023)"},
+  {"label": "大聲警示", "char_uuid": "1A220008-8E22-4541-9D4C-21EDAE82ED19", "type": "display", "data_format": "uint8", "unit": "0/1"},
+  {"label": "LED1 開關", "char_uuid": "1A22F002-8E22-4541-9D4C-21EDAE82ED19", "type": "controller", "data_format": "uint8", "unit": "0/1"},
+  {"label": "控制旗標", "char_uuid": "1A22F003-8E22-4541-9D4C-21EDAE82ED19", "type": "controller", "data_format": "uint8", "unit": "bitmask"}
 ]
