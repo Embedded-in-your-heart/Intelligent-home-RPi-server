@@ -18,7 +18,7 @@
   <div class="card shadow-sm mb-4">
     <div class="card-body">
       <h2 class="card-title h5">
-        <a href="{{ url_for('devices.detail', device_id=device.id) }}">{{ device.name }}</a>
+        <a href="{{ url_for('devices.detail', device_id=device.id) }}">{{ device.display_name }}</a>
         <span class="badge {{ {'connected':'bg-success','reconnecting':'bg-warning','disconnected':'bg-secondary'}.get(status, 'bg-secondary') }}"
               data-device-id="{{ device.id }}">{{ status }}</span>
         <small class="text-muted"><code>{{ device.address }}</code></small>

@@ -68,3 +68,40 @@ def test_migration_idempotent_preserves_existing_values() -> None:
     ).fetchone()
     assert row["addr_type"] == "public"
     conn.close()
+
+
+def test_migration_adds_label_column_as_null() -> None:
+    # Old DB without the label column; after migration the column must exist
+    # and existing rows must have NULL as their label value.
+    conn = _old_db()
+    conn.execute(
+        "INSERT INTO devices (address, name, owner_user_id) "
+        "VALUES ('aa:bb:cc:dd:ee:ff', 'sensor', 1)"
+    )
+    connection.apply_migrations(conn)
+    cols = {r["name"] for r in conn.execute("PRAGMA table_info(devices)")}
+    assert "label" in cols
+    row = conn.execute(
+        "SELECT label FROM devices WHERE address = 'aa:bb:cc:dd:ee:ff'"
+    ).fetchone()
+    assert row["label"] is None
+    conn.close()
+
+
+def test_migration_label_idempotent() -> None:
+    # Running apply_migrations twice must not overwrite a label written in between.
+    conn = _old_db()
+    conn.execute(
+        "INSERT INTO devices (address, name, owner_user_id) "
+        "VALUES ('aa:bb:cc:dd:ee:ff', 'sensor', 1)"
+    )
+    connection.apply_migrations(conn)
+    conn.execute(
+        "UPDATE devices SET label = 'Kitchen' WHERE address = 'aa:bb:cc:dd:ee:ff'"
+    )
+    connection.apply_migrations(conn)  # second run must not touch the column
+    row = conn.execute(
+        "SELECT label FROM devices WHERE address = 'aa:bb:cc:dd:ee:ff'"
+    ).fetchone()
+    assert row["label"] == "Kitchen"
+    conn.close()

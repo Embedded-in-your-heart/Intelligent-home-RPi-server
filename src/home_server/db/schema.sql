@@ -12,6 +12,7 @@ CREATE TABLE IF NOT EXISTS devices (
     id             INTEGER PRIMARY KEY AUTOINCREMENT,
     address        TEXT NOT NULL UNIQUE,
     name           TEXT NOT NULL,
+    label          TEXT,
     owner_user_id  INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
     addr_type           TEXT NOT NULL DEFAULT 'public' CHECK (addr_type IN ('public', 'random')),
     last_connected_at   TIMESTAMP,

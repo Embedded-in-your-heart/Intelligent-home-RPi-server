@@ -188,3 +188,37 @@ def test_add_device_coerces_invalid_addr_type_to_inference(db_conn, owner) -> No
     )
     assert d.addr_type == "random"
     assert mock.connect_calls == [(RANDOM_ADDR, "random")]
+
+
+def test_service_set_label_stores_trimmed_value(db_conn, owner) -> None:
+    svc = DeviceService(MockBLEManager())
+    device = svc.add_device(db_conn, owner_user_id=owner, address=ADDR, name="Sensor")
+    svc.set_label(db_conn, device.id, "  Kitchen  ")
+    d = devices.get_by_id(db_conn, device.id)
+    assert d is not None
+    assert d.label == "Kitchen"
+
+
+def test_service_set_label_blank_becomes_none(db_conn, owner) -> None:
+    svc = DeviceService(MockBLEManager())
+    device = svc.add_device(db_conn, owner_user_id=owner, address=ADDR, name="Sensor")
+    svc.set_label(db_conn, device.id, "  Kitchen  ")
+    svc.set_label(db_conn, device.id, "   ")
+    d = devices.get_by_id(db_conn, device.id)
+    assert d is not None
+    assert d.label is None
+
+
+def test_service_set_label_empty_string_becomes_none(db_conn, owner) -> None:
+    svc = DeviceService(MockBLEManager())
+    device = svc.add_device(db_conn, owner_user_id=owner, address=ADDR, name="Sensor")
+    svc.set_label(db_conn, device.id, "")
+    d = devices.get_by_id(db_conn, device.id)
+    assert d is not None
+    assert d.label is None
+
+
+def test_service_set_label_missing_device_raises(db_conn) -> None:
+    svc = DeviceService(MockBLEManager())
+    with pytest.raises(DeviceNotFoundError):
+        svc.set_label(db_conn, 999, "label")

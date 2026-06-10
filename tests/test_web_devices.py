@@ -288,3 +288,56 @@ def test_add_device_form_addr_type_overrides_inference(
         conn.close()
     assert device is not None
     assert device.addr_type == "public"
+
+
+def test_set_label_shows_display_name_in_list(
+    app: Flask, logged_in_client: FlaskClient
+) -> None:
+    conn = connection.connect(app.config["DB_PATH"])
+    try:
+        device_id = devices.create(
+            conn, address="AA:BB:CC:DD:EE:10", name="Bulb", owner_user_id=1
+        )
+    finally:
+        conn.close()
+    token = _csrf_token(logged_in_client, "/devices")
+    resp = logged_in_client.post(
+        f"/devices/{device_id}/label",
+        data={"label": "Living Room", "csrf_token": token},
+        follow_redirects=True,
+    )
+    assert resp.status_code == 200
+    # display_name should now show the label instead of the name
+    assert b"Living Room" in resp.data
+
+
+def test_set_label_empty_clears_label_falls_back_to_name(
+    app: Flask, logged_in_client: FlaskClient
+) -> None:
+    conn = connection.connect(app.config["DB_PATH"])
+    try:
+        device_id = devices.create(
+            conn, address="AA:BB:CC:DD:EE:11", name="Thermostat", owner_user_id=1
+        )
+        # Set an initial label
+        devices.set_label(conn, device_id, "Old Label")
+    finally:
+        conn.close()
+    token = _csrf_token(logged_in_client, "/devices")
+    resp = logged_in_client.post(
+        f"/devices/{device_id}/label",
+        data={"label": "", "csrf_token": token},
+        follow_redirects=True,
+    )
+    assert resp.status_code == 200
+    # display_name falls back to name when label is cleared
+    assert b"Thermostat" in resp.data
+
+
+def test_set_label_missing_device_returns_404(logged_in_client: FlaskClient) -> None:
+    token = _csrf_token(logged_in_client, "/devices")
+    resp = logged_in_client.post(
+        "/devices/999/label",
+        data={"label": "Ghost", "csrf_token": token},
+    )
+    assert resp.status_code == 404
