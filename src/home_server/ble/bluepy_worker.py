@@ -69,10 +69,17 @@ class _NotifyDelegate(btle.DefaultDelegate):
 
 
 class _PeripheralWorker(threading.Thread):
-    def __init__(self, address: str, addr_type: str = "public") -> None:
+    def __init__(
+        self,
+        address: str,
+        addr_type: str = "public",
+        *,
+        adapter_lock: threading.Lock,
+    ) -> None:
         super().__init__(name=f"ble-worker-{address}", daemon=True)
         self.address = address
         self._addr_type = addr_type
+        self._adapter_lock = adapter_lock
         self._queue: queue.Queue[_Cmd] = queue.Queue()
         self._peripheral: btle.Peripheral | None = None
         self._delegate = _NotifyDelegate()
@@ -104,7 +111,14 @@ class _PeripheralWorker(threading.Thread):
 
     def run(self) -> None:
         try:
-            self._peripheral = btle.Peripheral(self.address, addrType=self._addr_type)
+            # Hold the adapter lock only around the blocking connect attempt.
+            # bluepy scanning and a pending LE Create Connection cannot share
+            # the hci adapter; BlueZ rejects mgmt commands with "Rejected" if
+            # both are in flight at once.  Releasing the lock immediately after
+            # btle.Peripheral() returns lets the command loop and disconnect
+            # cleanup proceed without blocking the scanner.
+            with self._adapter_lock:
+                self._peripheral = btle.Peripheral(self.address, addrType=self._addr_type)
             self._peripheral.withDelegate(self._delegate)
             self._connected.set()
             self._connect_future.set_result(None)

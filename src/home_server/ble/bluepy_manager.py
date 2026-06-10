@@ -31,20 +31,38 @@ class BluepyManager:
     def __init__(self, default_op_timeout_s: float = 10.0) -> None:
         self._workers: dict[str, _PeripheralWorker] = {}
         self._lock = threading.Lock()
+        # Serializes adapter ownership: bluepy scanning and a pending LE Create
+        # Connection cannot share the hci adapter simultaneously or BlueZ rejects
+        # the scanner's mgmt commands with "Rejected".  scan_window() already
+        # stops the reconnect monitor (so no new connect attempts are launched),
+        # but may not interrupt an in-flight btle.Peripheral() call; acquiring
+        # this lock in start_scan() causes it to wait out the last in-flight
+        # attempt rather than collide with it.
+        self._adapter_lock = threading.Lock()
         self._op_timeout_s = default_op_timeout_s
 
     # ---- BLEManager protocol ----
 
     def start_scan(self, duration_s: float) -> list[DiscoveredDevice]:
+        # Acquire the adapter lock for the entire scan.  bluepy scanning and a
+        # pending LE Create Connection (inside a _PeripheralWorker.run()) cannot
+        # share the hci adapter; BlueZ rejects the scanner's mgmt commands (e.g.
+        # "scanend") with error code 11 ("Rejected") if a connect attempt is still
+        # in flight.  scan_window() stops the reconnect monitor so no new workers
+        # are started, but an already-running worker may be mid-way through
+        # btle.Peripheral(); holding this lock here causes start_scan() to wait
+        # out that last attempt instead of colliding with it.
+        #
         # Even with peripherals disconnected for the scan window, bluepy's
         # Scanner.stop() (mgmt "scanend") can intermittently observe a stale
         # disconnect event and raise. Retry once before giving up; the caller
         # turns a second failure into a recoverable message, not a 500.
-        try:
-            entries = btle.Scanner().scan(duration_s)
-        except btle.BTLEDisconnectError:
-            log.warning("BLE scan interrupted by a disconnect event; retrying once")
-            entries = btle.Scanner().scan(duration_s)
+        with self._adapter_lock:
+            try:
+                entries = btle.Scanner().scan(duration_s)
+            except btle.BTLEDisconnectError:
+                log.warning("BLE scan interrupted by a disconnect event; retrying once")
+                entries = btle.Scanner().scan(duration_s)
         out: list[DiscoveredDevice] = []
         for e in entries:
             # ScanEntry.getValueText(9) = Complete Local Name (AD type 0x09).
@@ -117,7 +135,7 @@ class BluepyManager:
             existing = self._workers.get(address)
             if existing is not None and existing.is_alive():
                 return existing
-            worker = _PeripheralWorker(address, addr_type)
+            worker = _PeripheralWorker(address, addr_type, adapter_lock=self._adapter_lock)
             worker.start()
             self._workers[address] = worker
             return worker
