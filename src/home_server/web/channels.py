@@ -25,6 +25,7 @@ from home_server.db.channels import DuplicateChannelNameError
 from home_server.presets import available_presets
 from home_server.services.channel_service import (
     DuplicateChannelUuidError,
+    UnknownWindowError,
     WrongChannelTypeError,
 )
 from home_server.web.db import get_conn
@@ -126,6 +127,23 @@ def channel_history(channel_id: int) -> Response:
     channel = channels.get_by_id(conn, channel_id)
     if channel is None:
         abort(404)
+    window = request.args.get("window")
+    if window is not None:
+        try:
+            points = get_channel_service().get_history_windowed(
+                conn, channel_id, window
+            )
+        except UnknownWindowError:
+            abort(400)
+        return jsonify(
+            {
+                "channel_id": channel_id,
+                "readings": [
+                    {"value": value, "recorded_at": recorded_at}
+                    for value, recorded_at in points
+                ],
+            }
+        )
     limit_raw = request.args.get("limit", type=int)
     limit = 200 if limit_raw is None else max(1, min(limit_raw, 1000))
     history = get_channel_service().get_history(conn, channel_id, limit=limit)

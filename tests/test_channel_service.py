@@ -10,6 +10,7 @@ from home_server.db.channels import ChannelNotFoundError
 from home_server.services.channel_service import (
     ChannelService,
     DuplicateChannelUuidError,
+    UnknownWindowError,
     WrongChannelTypeError,
 )
 
@@ -181,6 +182,52 @@ def test_get_history_returns_readings(db_conn, device_id) -> None:
     history = svc.get_history(db_conn, channel.id)
     assert len(history) == 1
     assert history[0].value == 5.0
+
+
+def test_get_history_windowed_filters_to_window(db_conn, device_id) -> None:
+    from datetime import UTC, datetime, timedelta
+
+    svc, _ = _make_service()
+    channel = svc.add_channel(
+        db_conn,
+        device_id=device_id,
+        name="temp",
+        type="display",
+        char_uuid=DISP_UUID,
+        data_format="uint8",
+    )
+    now = datetime(2026, 5, 27, 12, 0, 0, tzinfo=UTC)
+    # Two readings inside the 1m window, one well outside it.
+    readings.insert(
+        db_conn, channel_id=channel.id, value=10.0,
+        recorded_at=now - timedelta(seconds=30),
+    )
+    readings.insert(
+        db_conn, channel_id=channel.id, value=20.0,
+        recorded_at=now - timedelta(seconds=20),
+    )
+    readings.insert(
+        db_conn, channel_id=channel.id, value=99.0,
+        recorded_at=now - timedelta(minutes=5),
+    )
+    points = svc.get_history_windowed(db_conn, channel.id, "1m", now=now)
+    # 1m uses 1s buckets, so the two in-window readings stay distinct; the
+    # 5-minute-old reading is excluded.
+    assert [v for v, _ in points] == [10.0, 20.0]
+
+
+def test_get_history_windowed_rejects_unknown_window(db_conn, device_id) -> None:
+    svc, _ = _make_service()
+    channel = svc.add_channel(
+        db_conn,
+        device_id=device_id,
+        name="temp",
+        type="display",
+        char_uuid=DISP_UUID,
+        data_format="uint8",
+    )
+    with pytest.raises(UnknownWindowError):
+        svc.get_history_windowed(db_conn, channel.id, "bogus")
 
 
 def test_list_by_device(db_conn, device_id) -> None:

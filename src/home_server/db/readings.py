@@ -104,6 +104,29 @@ def latest_at_or_above(
     return Reading.from_row(row) if row else None
 
 
+def downsample_since(
+    conn: sqlite3.Connection,
+    channel_id: int,
+    *,
+    since: datetime,
+    bucket_seconds: int,
+) -> list[tuple[float, str]]:
+    """Average readings at or after ``since`` into fixed ``bucket_seconds`` buckets.
+
+    Returns one ``(avg_value, latest_recorded_at)`` per non-empty bucket, oldest
+    first. Bucketing bounds the chart payload for wide observation windows where
+    sending every reading would be far too many points.
+    """
+    rows = conn.execute(
+        "SELECT AVG(value) AS value, MAX(recorded_at) AS recorded_at "
+        "FROM readings WHERE channel_id = ? AND recorded_at >= ? "
+        "GROUP BY CAST(strftime('%s', recorded_at) AS INTEGER) / ? "
+        "ORDER BY recorded_at ASC",
+        (channel_id, _format_ts(since), bucket_seconds),
+    ).fetchall()
+    return [(float(r["value"]), r["recorded_at"]) for r in rows]
+
+
 def count_by_channel(conn: sqlite3.Connection, channel_id: int) -> int:
     row = conn.execute(
         "SELECT COUNT(*) AS n FROM readings WHERE channel_id = ?",

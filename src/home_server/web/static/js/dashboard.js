@@ -10,21 +10,43 @@
       });
     });
 
+    // Parse both DB ("YYYY-MM-DD HH:MM:SS" UTC, no tz marker) and live ISO 8601
+    // (with offset) timestamps to epoch milliseconds.
+    function tsToMs(ts) {
+      if (!ts) return 0;
+      var iso = ts.indexOf("T") === -1 ? ts.replace(" ", "T") + "Z" : ts;
+      var d = new Date(iso);
+      return isNaN(d.getTime()) ? 0 : d.getTime();
+    }
+
+    function formatTs(ts) {
+      var ms = tsToMs(ts);
+      return ms ? new Date(ms).toLocaleString() : (ts || null);
+    }
+
+    // Global observation window: how far back charts show. Buttons in
+    // #window-selector switch it; the live feed trims to the same span.
+    var WINDOW_MS = { "1m": 60e3, "10m": 600e3, "1h": 3600e3, "1d": 86400e3, "1w": 604800e3 };
+    var windowSelector = document.getElementById("window-selector");
+    var currentWindow = null;
+    if (windowSelector) {
+      var activeBtn = windowSelector.querySelector("[data-window].active");
+      currentWindow = activeBtn ? activeBtn.getAttribute("data-window") : "1m";
+    }
+
     var canvases = document.querySelectorAll("canvas[data-channel-id]");
     var charts = {};
-    canvases.forEach(function (canvas) {
-      var channelId = parseInt(canvas.getAttribute("data-channel-id"), 10);
-      var unit = canvas.getAttribute("data-unit") || "value";
-      var chart = new Chart(canvas, {
-        type: "line",
-        data: { labels: [], datasets: [{ label: unit, data: [], tension: 0.3 }] },
-        options: { animation: false, scales: { x: { display: false } } },
-      });
-      charts[channelId] = chart;
 
-      fetch("/channels/" + channelId + "/history")
+    function loadChart(channelId) {
+      var chart = charts[channelId];
+      if (!chart) return;
+      var url = "/channels/" + channelId + "/history";
+      if (currentWindow) url += "?window=" + currentWindow;
+      fetch(url)
         .then(function (r) { return r.json(); })
         .then(function (j) {
+          chart.data.labels = [];
+          chart.data.datasets[0].data = [];
           j.readings.forEach(function (pt) {
             chart.data.labels.push(pt.recorded_at);
             chart.data.datasets[0].data.push(pt.value);
@@ -34,21 +56,35 @@
         .catch(function (err) {
           console.warn("history fetch failed for channel " + channelId, err);
         });
+    }
 
+    canvases.forEach(function (canvas) {
+      var channelId = parseInt(canvas.getAttribute("data-channel-id"), 10);
+      var unit = canvas.getAttribute("data-unit") || "value";
+      charts[channelId] = new Chart(canvas, {
+        type: "line",
+        data: { labels: [], datasets: [{ label: unit, data: [], tension: 0.3 }] },
+        options: { animation: false, scales: { x: { display: false } } },
+      });
+      loadChart(channelId);
       sock.emit("subscribe_channel", { channel_id: channelId });
     });
 
+    if (windowSelector) {
+      windowSelector.querySelectorAll("[data-window]").forEach(function (btn) {
+        btn.addEventListener("click", function () {
+          windowSelector.querySelectorAll("[data-window]").forEach(function (b) {
+            b.classList.remove("active");
+          });
+          btn.classList.add("active");
+          currentWindow = btn.getAttribute("data-window");
+          Object.keys(charts).forEach(function (id) { loadChart(parseInt(id, 10)); });
+        });
+      });
+    }
+
     // 0/1 flag channels: an LED plus the time the flag last became 1.
     var FLAG_ON = 0.5;
-
-    function formatTs(ts) {
-      if (!ts) return null;
-      // DB timestamps are "YYYY-MM-DD HH:MM:SS" in UTC with no tz marker; the
-      // live socket sends ISO 8601 with an offset. Normalize both to a Date.
-      var iso = ts.indexOf("T") === -1 ? ts.replace(" ", "T") + "Z" : ts;
-      var d = new Date(iso);
-      return isNaN(d.getTime()) ? ts : d.toLocaleString();
-    }
 
     var flags = {};
     document.querySelectorAll("[data-flag-channel-id]").forEach(function (el) {
@@ -86,7 +122,14 @@
       if (chart) {
         chart.data.labels.push(d.timestamp);
         chart.data.datasets[0].data.push(d.value);
-        if (chart.data.labels.length > 60) {
+        if (currentWindow) {
+          // Drop points that fell outside the selected observation window.
+          var cutoff = Date.now() - WINDOW_MS[currentWindow];
+          while (chart.data.labels.length && tsToMs(chart.data.labels[0]) < cutoff) {
+            chart.data.labels.shift();
+            chart.data.datasets[0].data.shift();
+          }
+        } else if (chart.data.labels.length > 60) {
           chart.data.labels.shift();
           chart.data.datasets[0].data.shift();
         }

@@ -93,6 +93,17 @@ def test_index_dashboard_lists_channels(
     assert f'data-channel-id="{channel_id}"' in body
 
 
+def test_index_shows_observation_window_selector(
+    app: Flask, logged_in_client: FlaskClient
+) -> None:
+    device_id = _make_device(app, "AA:BB:CC:DD:EE:45", "Sensor5")
+    _add_channel(app, device_id, name="Temp", type_="display", char_uuid="uuid-w")
+    body = logged_in_client.get("/").get_data(as_text=True)
+    assert 'id="window-selector"' in body
+    for window in ("1m", "10m", "1h", "1d", "1w"):
+        assert f'data-window="{window}"' in body
+
+
 def test_detail_shows_device_status_badge(
     app: Flask, logged_in_client: FlaskClient
 ) -> None:

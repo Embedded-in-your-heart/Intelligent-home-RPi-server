@@ -97,6 +97,31 @@ def test_delete_older_than(db_conn, channel_id) -> None:
     assert remaining == [3.0, 4.0]
 
 
+def test_downsample_averages_into_buckets(db_conn, channel_id) -> None:
+    base = datetime(2026, 5, 27, 12, 0, 0, tzinfo=UTC)
+    # Two readings in the first 60s bucket, one in the next.
+    _insert_at(db_conn, channel_id, 10.0, base, seconds=10)
+    _insert_at(db_conn, channel_id, 20.0, base, seconds=30)
+    _insert_at(db_conn, channel_id, 5.0, base, seconds=70)
+    points = readings.downsample_since(
+        db_conn, channel_id, since=base, bucket_seconds=60
+    )
+    assert [v for v, _ in points] == [15.0, 5.0]  # avg(10,20)=15, then 5
+    # recorded_at is the latest timestamp within each bucket.
+    assert points[0][1] == "2026-05-27 12:00:30"
+    assert points[1][1] == "2026-05-27 12:01:10"
+
+
+def test_downsample_excludes_readings_before_since(db_conn, channel_id) -> None:
+    base = datetime(2026, 5, 27, 12, 0, 0, tzinfo=UTC)
+    _insert_at(db_conn, channel_id, 1.0, base, seconds=-30)  # before since
+    _insert_at(db_conn, channel_id, 2.0, base, seconds=30)
+    points = readings.downsample_since(
+        db_conn, channel_id, since=base, bucket_seconds=60
+    )
+    assert [v for v, _ in points] == [2.0]
+
+
 def test_cascade_on_channel_delete(db_conn, channel_id) -> None:
     readings.insert(db_conn, channel_id=channel_id, value=1.0)
     channels.delete(db_conn, channel_id)

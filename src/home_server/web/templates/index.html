@@ -4,6 +4,16 @@
 <h1 class="h4 mb-3">Dashboard</h1>
 
 {% if overview %}
+  <div class="d-flex align-items-center gap-2 mb-3" id="window-selector">
+    <span class="text-muted small">觀測週期</span>
+    <div class="btn-group btn-group-sm" role="group" aria-label="觀測週期">
+      <button type="button" class="btn btn-outline-primary active" data-window="1m">1 分</button>
+      <button type="button" class="btn btn-outline-primary" data-window="10m">10 分</button>
+      <button type="button" class="btn btn-outline-primary" data-window="1h">1 時</button>
+      <button type="button" class="btn btn-outline-primary" data-window="1d">1 天</button>
+      <button type="button" class="btn btn-outline-primary" data-window="1w">1 週</button>
+    </div>
+  </div>
   {% for device, status, device_channels in overview %}
   <div class="card shadow-sm mb-4">
     <div class="card-body">

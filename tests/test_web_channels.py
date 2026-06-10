@@ -396,6 +396,45 @@ def test_history_missing_channel_404(logged_in_client: FlaskClient) -> None:
     assert resp.status_code == 404
 
 
+def test_history_window_returns_downsampled_readings(
+    app: Flask, logged_in_client: FlaskClient
+) -> None:
+    from datetime import UTC, datetime, timedelta
+
+    device_id = _make_device(app, "AA:BB:CC:DD:EE:35", "Sensor3")
+    conn = connection.connect(app.config["DB_PATH"])
+    try:
+        channel_id = channels.create(
+            conn, device_id=device_id, name="Temp", type="display",
+            char_uuid="uuid-t", data_format="float32_le", unit="°C",
+        )
+        recent = datetime.now(UTC) - timedelta(seconds=5)
+        readings.insert(conn, channel_id=channel_id, value=24.0, recorded_at=recent)
+    finally:
+        conn.close()
+    resp = logged_in_client.get(f"/channels/{channel_id}/history?window=1m")
+    assert resp.status_code == 200
+    body = resp.get_json()
+    assert body["channel_id"] == channel_id
+    assert [r["value"] for r in body["readings"]] == [24.0]
+
+
+def test_history_invalid_window_400(
+    app: Flask, logged_in_client: FlaskClient
+) -> None:
+    device_id = _make_device(app, "AA:BB:CC:DD:EE:36", "Sensor4")
+    conn = connection.connect(app.config["DB_PATH"])
+    try:
+        channel_id = channels.create(
+            conn, device_id=device_id, name="Temp", type="display",
+            char_uuid="uuid-t", data_format="uint8", unit="C",
+        )
+    finally:
+        conn.close()
+    resp = logged_in_client.get(f"/channels/{channel_id}/history?window=bogus")
+    assert resp.status_code == 400
+
+
 def test_flag_reports_current_state_and_last_on(
     app: Flask, logged_in_client: FlaskClient
 ) -> None:

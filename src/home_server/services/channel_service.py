@@ -11,7 +11,7 @@ from __future__ import annotations
 import logging
 import sqlite3
 from collections.abc import Callable
-from datetime import UTC, datetime
+from datetime import UTC, datetime, timedelta
 
 from home_server.ble import parser
 from home_server.ble.interface import BLEManager
@@ -29,8 +29,23 @@ ReadingCallback = Callable[[int, float, str], None]
 # A 0/1 flag channel is considered "on" once its value reaches this threshold.
 _FLAG_ON_THRESHOLD = 0.5
 
+# Dashboard observation windows: key -> (window seconds, downsample bucket
+# seconds). Bucket sizes keep each window around a few hundred points so charts
+# stay light regardless of how dense the underlying readings are.
+OBSERVATION_WINDOWS: dict[str, tuple[int, int]] = {
+    "1m": (60, 1),
+    "10m": (600, 2),
+    "1h": (3600, 12),
+    "1d": (86400, 300),
+    "1w": (604800, 1800),
+}
+
 
 class WrongChannelTypeError(ValueError):
+    pass
+
+
+class UnknownWindowError(ValueError):
     pass
 
 
@@ -134,6 +149,30 @@ class ChannelService:
     ) -> list[Reading]:
         return readings.list_by_channel(
             conn, channel_id, since=since, until=until, limit=limit
+        )
+
+    def get_history_windowed(
+        self,
+        conn: sqlite3.Connection,
+        channel_id: int,
+        window: str,
+        *,
+        now: datetime | None = None,
+    ) -> list[tuple[float, str]]:
+        """Downsampled readings for an observation ``window`` (e.g. ``"1h"``).
+
+        Returns ``(value, recorded_at)`` points from ``now - window`` to now,
+        averaged into buckets sized for the window. Raises
+        ``UnknownWindowError`` for an unrecognized window key.
+        """
+        spec = OBSERVATION_WINDOWS.get(window)
+        if spec is None:
+            raise UnknownWindowError(f"unknown window: {window!r}")
+        window_seconds, bucket_seconds = spec
+        current = now if now is not None else datetime.now(UTC)
+        since = current - timedelta(seconds=window_seconds)
+        return readings.downsample_since(
+            conn, channel_id, since=since, bucket_seconds=bucket_seconds
         )
 
     def get_flag_state(
