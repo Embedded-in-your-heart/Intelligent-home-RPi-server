@@ -290,6 +290,8 @@ class BleRuntime:
         # Per-uuid tick counters for enum and dBA channels.
         enum_ticks: dict[str, int] = {}
         dba_ticks: dict[str, int] = {}
+        # Per-uuid tick counters for vibration-magnitude (mg) channels.
+        mg_ticks: dict[str, int] = {}
 
         def feed(address: str, char_uuid: str) -> bytes | None:
             nonlocal analog_n
@@ -315,6 +317,19 @@ class BleRuntime:
                 dba_ticks[char_uuid] = count
                 base = 40.0 + 8.0 * math.sin(count / 10.0)
                 value = base + 25.0 if count % 30 == 0 else base
+            elif channel.unit == "mg":
+                # Vibration-magnitude channel (VibrationRMS): quiet baseline with
+                # a 15-tick burst every 40-tick cycle to simulate an appliance
+                # spinning up so VibrationAlert-style flags demo well.
+                count = mg_ticks.get(char_uuid, 0) + 1
+                mg_ticks[char_uuid] = count
+                phase = count % 40
+                if 0 < phase <= 15:
+                    # Burst window: high-amplitude vibration
+                    value = 80.0 + 10.0 * math.sin(count / 3.0)
+                else:
+                    # Quiet baseline
+                    value = 5.0 + 3.0 * math.sin(count / 7.0)
             elif channel.unit == "0/1":
                 # Binary flag: mostly 0 with a brief 1 every 20 ticks, so the
                 # dashboard flag visibly triggers and then recovers to normal.
