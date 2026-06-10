@@ -15,6 +15,8 @@ ADDR = "AA:BB:CC:DD:EE:FF"
 DISP_UUID = "uuid-disp"
 CTRL_UUID = "uuid-ctrl"
 FLAG_UUID = "uuid-flag"
+ENUM_UUID = "uuid-sound-class"
+DBA_UUID = "uuid-dba"
 
 
 @pytest.fixture
@@ -36,6 +38,15 @@ def db_path(tmp_path: Path) -> Path:
         channels.create(
             conn, device_id=did, name="alert", type="display",
             char_uuid=FLAG_UUID, data_format="uint8", unit="0/1",
+        )
+        channels.create(
+            conn, device_id=did, name="sound_class", type="display",
+            char_uuid=ENUM_UUID, data_format="uint8",
+            unit="enum:0=安靜,1=語音,2=拍手,3=警報,4=其他",
+        )
+        channels.create(
+            conn, device_id=did, name="mic_dba", type="display",
+            char_uuid=DBA_UUID, data_format="float32_le", unit="dBA",
         )
     finally:
         conn.close()
@@ -249,3 +260,34 @@ def test_scan_window_restarts_monitor_when_running(db_path: Path) -> None:
         assert rt._monitor_worker is not None  # restored afterwards
     finally:
         rt.monitor_stop()
+
+
+def test_make_feed_enum_channel_emits_only_valid_keys(db_path: Path) -> None:
+    # Enum feed must only emit values that are keys of the parsed mapping.
+    ble = MockBLEManager()
+    rt, _ = _runtime(db_path, ble)
+    rt.activate()
+    feed = rt.make_feed()
+    values = [parser.decode(feed(ADDR, ENUM_UUID), "uint8") for _ in range(60)]  # type: ignore[arg-type]
+    valid_keys = {0.0, 1.0, 2.0, 3.0, 4.0}
+    assert all(v in valid_keys for v in values)
+    # Class 0 must dominate (at most 1 non-zero per 6 ticks).
+    assert values.count(0.0) > len(values) // 2
+    # At least one non-zero class must appear over 60 ticks (every 6th tick).
+    assert any(v != 0.0 for v in values)
+
+
+def test_make_feed_dba_channel_emits_plausible_range(db_path: Path) -> None:
+    # Baseline: 40 ± 8 dB(A); spike: baseline + 25 every 30th tick.
+    # Expected range: [32, 73].  Test uses [28, 75] to allow float32 rounding.
+    ble = MockBLEManager()
+    rt, _ = _runtime(db_path, ble)
+    rt.activate()
+    feed = rt.make_feed()
+    values = [parser.decode(feed(ADDR, DBA_UUID), "float32_le") for _ in range(60)]  # type: ignore[arg-type]
+    assert all(28.0 <= v <= 75.0 for v in values), (
+        f"dBA feed out of [28, 75] range: min={min(values):.1f} max={max(values):.1f}"
+    )
+    # Must include both quiet baseline and at least one spike tick (tick 30).
+    assert min(values) < 45.0, "expected quiet baseline ticks below 45 dB(A)"
+    assert max(values) > 60.0, "expected spike tick above 60 dB(A)"

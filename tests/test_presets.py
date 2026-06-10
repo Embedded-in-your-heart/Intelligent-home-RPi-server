@@ -121,6 +121,10 @@ def test_empty_list_is_valid(tmp_path: Path) -> None:
 def test_shipped_catalog_loads() -> None:
     repo_root = Path(__file__).parent.parent
     presets = load_presets(repo_root / "data" / "channel_presets.json")
-    assert len(presets) == 9
+    assert len(presets) == 12
     labels = {p.label for p in presets}
     assert "溫度 (°C)" in labels
+    uuids = {p.char_uuid for p in presets}
+    assert "1A220009-8E22-4541-9D4C-21EDAE82ED19" in uuids
+    assert "1A22000A-8E22-4541-9D4C-21EDAE82ED19" in uuids
+    assert "1A22000B-8E22-4541-9D4C-21EDAE82ED19" in uuids

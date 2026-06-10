@@ -26,6 +26,7 @@ from home_server.db import channels, devices
 from home_server.db.channels import Channel
 from home_server.db.devices import Device
 from home_server.services.channel_service import ChannelService
+from home_server.services.units import parse_enum_unit
 
 log = logging.getLogger(__name__)
 
@@ -286,13 +287,35 @@ class BleRuntime:
         analog_n = 0
         # Per-flag tick counters so each 0/1 channel toggles independently.
         flag_ticks: dict[str, int] = {}
+        # Per-uuid tick counters for enum and dBA channels.
+        enum_ticks: dict[str, int] = {}
+        dba_ticks: dict[str, int] = {}
 
         def feed(address: str, char_uuid: str) -> bytes | None:
             nonlocal analog_n
             channel = self._subscribed.get((address, char_uuid))
             if channel is None:
                 return None
-            if channel.unit == "0/1":
+
+            enum_map = parse_enum_unit(channel.unit)
+            if enum_map is not None:
+                # Enum channel: emit class 0 most ticks; on every 6th tick cycle
+                # deterministically through the non-zero classes.
+                count = enum_ticks.get(char_uuid, 0) + 1
+                enum_ticks[char_uuid] = count
+                nonzero_keys = sorted(k for k in enum_map if k != 0)
+                if nonzero_keys and count % 6 == 0:
+                    value = float(nonzero_keys[(count // 6 - 1) % len(nonzero_keys)])
+                else:
+                    value = 0.0
+            elif channel.unit == "dBA":
+                # dBA channel: sine wave around 40 dB(A) with a +25 spike every
+                # 30th tick to simulate a loud event on the dashboard demo.
+                count = dba_ticks.get(char_uuid, 0) + 1
+                dba_ticks[char_uuid] = count
+                base = 40.0 + 8.0 * math.sin(count / 10.0)
+                value = base + 25.0 if count % 30 == 0 else base
+            elif channel.unit == "0/1":
                 # Binary flag: mostly 0 with a brief 1 every 20 ticks, so the
                 # dashboard flag visibly triggers and then recovers to normal.
                 count = flag_ticks.get(char_uuid, 0) + 1
