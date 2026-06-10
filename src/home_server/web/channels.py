@@ -137,3 +137,22 @@ def channel_history(channel_id: int) -> Response:
             ],
         }
     )
+
+
+@bp.get("/channels/<int:channel_id>/flag")
+@login_required
+def channel_flag(channel_id: int) -> Response:
+    """Current state and last-triggered time for a 0/1 flag channel."""
+    conn = get_conn()
+    channel = channels.get_by_id(conn, channel_id)
+    if channel is None:
+        abort(404)
+    latest, last_on = get_channel_service().get_flag_state(conn, channel_id)
+    return jsonify(
+        {
+            "channel_id": channel_id,
+            "value": latest.value if latest else None,
+            "recorded_at": latest.recorded_at if latest else None,
+            "last_on_at": last_on.recorded_at if last_on else None,
+        }
+    )

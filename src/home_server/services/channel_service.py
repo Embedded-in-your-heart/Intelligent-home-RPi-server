@@ -26,6 +26,10 @@ log = logging.getLogger(__name__)
 ReadingCallback = Callable[[int, float, str], None]
 
 
+# A 0/1 flag channel is considered "on" once its value reaches this threshold.
+_FLAG_ON_THRESHOLD = 0.5
+
+
 class WrongChannelTypeError(ValueError):
     pass
 
@@ -131,6 +135,20 @@ class ChannelService:
         return readings.list_by_channel(
             conn, channel_id, since=since, until=until, limit=limit
         )
+
+    def get_flag_state(
+        self, conn: sqlite3.Connection, channel_id: int
+    ) -> tuple[Reading | None, Reading | None]:
+        """State for a 0/1 flag channel.
+
+        Returns ``(latest, last_on)`` where ``latest`` is the most recent
+        reading (the current flag state) and ``last_on`` is the most recent
+        reading at which the flag became 1. Either may be None when there is
+        no matching reading yet.
+        """
+        latest = readings.latest_by_channel(conn, channel_id)
+        last_on = readings.latest_at_or_above(conn, channel_id, _FLAG_ON_THRESHOLD)
+        return latest, last_on
 
     def list_by_device(
         self, conn: sqlite3.Connection, device_id: int

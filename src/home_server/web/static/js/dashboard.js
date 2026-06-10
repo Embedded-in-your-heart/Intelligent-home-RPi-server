@@ -38,16 +38,65 @@
       sock.emit("subscribe_channel", { channel_id: channelId });
     });
 
+    // 0/1 flag channels: an LED plus the time the flag last became 1.
+    var FLAG_ON = 0.5;
+
+    function formatTs(ts) {
+      if (!ts) return null;
+      // DB timestamps are "YYYY-MM-DD HH:MM:SS" in UTC with no tz marker; the
+      // live socket sends ISO 8601 with an offset. Normalize both to a Date.
+      var iso = ts.indexOf("T") === -1 ? ts.replace(" ", "T") + "Z" : ts;
+      var d = new Date(iso);
+      return isNaN(d.getTime()) ? ts : d.toLocaleString();
+    }
+
+    var flags = {};
+    document.querySelectorAll("[data-flag-channel-id]").forEach(function (el) {
+      var channelId = parseInt(el.getAttribute("data-flag-channel-id"), 10);
+      var led = el.querySelector("[data-flag-led]");
+      var stateEl = el.querySelector("[data-flag-state]");
+      var lastEl = el.querySelector("[data-flag-last]");
+
+      function render(value, lastOn) {
+        var on = value != null && value >= FLAG_ON;
+        led.classList.toggle("flag-on", on);
+        stateEl.textContent = value == null ? "尚無資料" : on ? "觸發中" : "正常";
+        var lt = formatTs(lastOn);
+        lastEl.textContent = lt ? "上次觸發：" + lt : "尚無觸發記錄";
+      }
+
+      var entry = { render: render, lastOn: null };
+      flags[channelId] = entry;
+
+      fetch("/channels/" + channelId + "/flag")
+        .then(function (r) { return r.json(); })
+        .then(function (j) {
+          entry.lastOn = j.last_on_at || null;
+          render(j.value, entry.lastOn);
+        })
+        .catch(function (err) {
+          console.warn("flag fetch failed for channel " + channelId, err);
+        });
+
+      sock.emit("subscribe_channel", { channel_id: channelId });
+    });
+
     sock.on("reading", function (d) {
       var chart = charts[d.channel_id];
-      if (!chart) return;
-      chart.data.labels.push(d.timestamp);
-      chart.data.datasets[0].data.push(d.value);
-      if (chart.data.labels.length > 60) {
-        chart.data.labels.shift();
-        chart.data.datasets[0].data.shift();
+      if (chart) {
+        chart.data.labels.push(d.timestamp);
+        chart.data.datasets[0].data.push(d.value);
+        if (chart.data.labels.length > 60) {
+          chart.data.labels.shift();
+          chart.data.datasets[0].data.shift();
+        }
+        chart.update();
       }
-      chart.update();
+      var flag = flags[d.channel_id];
+      if (flag) {
+        if (d.value >= FLAG_ON) flag.lastOn = d.timestamp;
+        flag.render(d.value, flag.lastOn);
+      }
     });
   }
 

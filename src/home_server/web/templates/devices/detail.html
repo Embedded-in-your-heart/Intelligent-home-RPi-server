@@ -19,14 +19,13 @@
     {% if channels %}
     <table class="table table-sm align-middle">
       <thead>
-        <tr><th>Name</th><th>Type</th><th>UUID</th><th>Format</th><th>Unit</th><th></th></tr>
+        <tr><th>Name</th><th>Type</th><th>Format</th><th>Unit</th><th></th></tr>
       </thead>
       <tbody>
         {% for channel in channels %}
         <tr>
           <td>{{ channel.name }}</td>
           <td>{{ channel.type }}</td>
-          <td><code>{{ channel.char_uuid }}</code></td>
           <td>{{ channel.data_format }}</td>
           <td>{{ channel.unit or "" }}</td>
           <td class="text-end">
@@ -54,7 +53,13 @@
     {% for channel in channels %}
     <div class="mb-4">
       <h3 class="h6">{{ channel.name }} <small class="text-muted">({{ channel.type }})</small></h3>
-      {% if channel.type == "display" %}
+      {% if channel.type == "display" and channel.unit == "0/1" %}
+      <div class="d-flex align-items-center gap-2" data-flag-channel-id="{{ channel.id }}">
+        <span class="flag-led" data-flag-led></span>
+        <span class="fw-semibold" data-flag-state>—</span>
+        <small class="text-muted" data-flag-last>載入中…</small>
+      </div>
+      {% elif channel.type == "display" %}
       <canvas data-channel-id="{{ channel.id }}" data-unit="{{ channel.unit or '' }}" height="80"></canvas>
       {% else %}
       <form method="post"

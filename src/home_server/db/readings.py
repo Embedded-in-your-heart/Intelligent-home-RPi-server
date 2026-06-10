@@ -82,6 +82,28 @@ def list_by_channel(
     return [Reading.from_row(r) for r in rows]
 
 
+def latest_by_channel(conn: sqlite3.Connection, channel_id: int) -> Reading | None:
+    """Return the most recent reading for a channel, or None if it has none."""
+    row = conn.execute(
+        "SELECT * FROM readings WHERE channel_id = ? "
+        "ORDER BY recorded_at DESC, id DESC LIMIT 1",
+        (channel_id,),
+    ).fetchone()
+    return Reading.from_row(row) if row else None
+
+
+def latest_at_or_above(
+    conn: sqlite3.Connection, channel_id: int, threshold: float
+) -> Reading | None:
+    """Return the most recent reading with ``value >= threshold``, or None."""
+    row = conn.execute(
+        "SELECT * FROM readings WHERE channel_id = ? AND value >= ? "
+        "ORDER BY recorded_at DESC, id DESC LIMIT 1",
+        (channel_id, threshold),
+    ).fetchone()
+    return Reading.from_row(row) if row else None
+
+
 def count_by_channel(conn: sqlite3.Connection, channel_id: int) -> int:
     row = conn.execute(
         "SELECT COUNT(*) AS n FROM readings WHERE channel_id = ?",

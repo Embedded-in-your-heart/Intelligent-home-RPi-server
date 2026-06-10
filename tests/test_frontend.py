@@ -46,6 +46,23 @@ def test_detail_shows_chart_for_display_channel(
     assert f'data-channel-id="{channel_id}"' in body
 
 
+def test_detail_shows_flag_for_binary_channel(
+    app: Flask, logged_in_client: FlaskClient
+) -> None:
+    device_id = _make_device(app, "AA:BB:CC:DD:EE:44", "Alert")
+    conn = connection.connect(app.config["DB_PATH"])
+    try:
+        channel_id = channels.create(
+            conn, device_id=device_id, name="Shake", type="display",
+            char_uuid="uuid-shake", data_format="uint8", unit="0/1",
+        )
+    finally:
+        conn.close()
+    body = logged_in_client.get(f"/devices/{device_id}").get_data(as_text=True)
+    assert f'data-flag-channel-id="{channel_id}"' in body
+    assert f'data-channel-id="{channel_id}"' not in body
+
+
 def test_detail_shows_control_form_for_controller(
     app: Flask, logged_in_client: FlaskClient
 ) -> None:
