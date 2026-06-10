@@ -17,54 +17,68 @@
   {% for device, status, device_channels in overview %}
   <div class="card shadow-sm mb-4">
     <div class="card-body">
-      <h2 class="card-title h5">
-        <a href="{{ url_for('devices.detail', device_id=device.id) }}">{{ device.display_name }}</a>
-        <span class="badge {{ {'connected':'bg-success','reconnecting':'bg-warning','disconnected':'bg-secondary'}.get(status, 'bg-secondary') }}"
-              data-device-id="{{ device.id }}">{{ status }}</span>
-        <small class="text-muted"><code>{{ device.address }}</code></small>
-      </h2>
-      {% if device_channels %}
-        {% for channel in device_channels %}
-        <div class="mb-3">
-          <h3 class="h6">{{ channel.name }} <small class="text-muted">({{ channel.type }})</small></h3>
-          {% if channel.type == "display" and channel.unit == "0/1" %}
-          <div class="d-flex align-items-center gap-2" data-flag-channel-id="{{ channel.id }}" data-flag-name="{{ channel.name }}">
-            <span class="flag-led" data-flag-led></span>
-            <span class="fw-semibold" data-flag-state>—</span>
-            <small class="text-muted" data-flag-last>載入中…</small>
+      <div class="d-flex justify-content-between align-items-start">
+        <h2 class="card-title h5 mb-0">
+          <a href="{{ url_for('devices.detail', device_id=device.id) }}">{{ device.display_name }}</a>
+          <span class="badge {{ {'connected':'bg-success','reconnecting':'bg-warning','disconnected':'bg-secondary'}.get(status, 'bg-secondary') }}"
+                data-device-id="{{ device.id }}">{{ status }}</span>
+          <small class="text-muted"><code>{{ device.address }}</code></small>
+        </h2>
+        <button class="btn btn-sm btn-link text-decoration-none p-0 device-collapse-toggle"
+                type="button"
+                data-bs-toggle="collapse"
+                data-bs-target="#device-body-{{ device.id }}"
+                aria-expanded="true"
+                aria-controls="device-body-{{ device.id }}">
+          <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 16 16" fill="currentColor" aria-hidden="true">
+            <path fill-rule="evenodd" d="M1.646 4.646a.5.5 0 0 1 .708 0L8 10.293l5.646-5.647a.5.5 0 0 1 .708.708l-6 6a.5.5 0 0 1-.708 0l-6-6a.5.5 0 0 1 0-.708z"/>
+          </svg>
+        </button>
+      </div>
+      <div class="collapse show" id="device-body-{{ device.id }}" data-device-collapse="{{ device.id }}">
+        {% if device_channels %}
+          {% for channel in device_channels %}
+          <div class="mb-3 mt-2">
+            <h3 class="h6">{{ channel.name }} <small class="text-muted">({{ channel.type }})</small></h3>
+            {% if channel.type == "display" and channel.unit == "0/1" %}
+            <div class="d-flex align-items-center gap-2" data-flag-channel-id="{{ channel.id }}" data-flag-name="{{ channel.name }}">
+              <span class="flag-led" data-flag-led></span>
+              <span class="fw-semibold" data-flag-state>—</span>
+              <small class="text-muted" data-flag-last>載入中…</small>
+            </div>
+            {% elif channel.type == "display" %}
+            <canvas data-channel-id="{{ channel.id }}" data-unit="{{ channel.unit or '' }}" height="70"></canvas>
+            {% elif channel.type == "controller" and channel.unit == "0/1" %}
+            <form hx-post="{{ url_for('channels.write_channel', channel_id=channel.id) }}"
+                  hx-swap="none"
+                  class="form-check form-switch">
+              {% set on = control_states.get(channel.id) %}
+              <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+              <input type="hidden" name="value" value="{{ '1' if on else '0' }}">
+              <input class="form-check-input" type="checkbox" role="switch"
+                     id="led-switch-{{ channel.id }}"{% if on %} checked{% endif %}
+                     onchange="var on=this.checked; this.form.elements.value.value = on ? '1' : '0'; this.nextElementSibling.textContent = on ? '開' : '關'; this.form.requestSubmit();">
+              <label class="form-check-label" for="led-switch-{{ channel.id }}">{{ '開' if on else '關' }}</label>
+            </form>
+            {% else %}
+            <form method="post"
+                  action="{{ url_for('channels.write_channel', channel_id=channel.id) }}"
+                  class="row g-2">
+              <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+              <div class="col-auto">
+                <input class="form-control form-control-sm" name="value" placeholder="value" required>
+              </div>
+              <div class="col-auto">
+                <button class="btn btn-sm btn-primary" type="submit">Send</button>
+              </div>
+            </form>
+            {% endif %}
           </div>
-          {% elif channel.type == "display" %}
-          <canvas data-channel-id="{{ channel.id }}" data-unit="{{ channel.unit or '' }}" height="70"></canvas>
-          {% elif channel.type == "controller" and channel.unit == "0/1" %}
-          <form hx-post="{{ url_for('channels.write_channel', channel_id=channel.id) }}"
-                hx-swap="none"
-                class="form-check form-switch">
-            {% set on = control_states.get(channel.id) %}
-            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-            <input type="hidden" name="value" value="{{ '1' if on else '0' }}">
-            <input class="form-check-input" type="checkbox" role="switch"
-                   id="led-switch-{{ channel.id }}"{% if on %} checked{% endif %}
-                   onchange="var on=this.checked; this.form.elements.value.value = on ? '1' : '0'; this.nextElementSibling.textContent = on ? '開' : '關'; this.form.requestSubmit();">
-            <label class="form-check-label" for="led-switch-{{ channel.id }}">{{ '開' if on else '關' }}</label>
-          </form>
-          {% else %}
-          <form method="post"
-                action="{{ url_for('channels.write_channel', channel_id=channel.id) }}"
-                class="row g-2">
-            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-            <div class="col-auto">
-              <input class="form-control form-control-sm" name="value" placeholder="value" required>
-            </div>
-            <div class="col-auto">
-              <button class="btn btn-sm btn-primary" type="submit">Send</button>
-            </div>
-          </form>
-          {% endif %}
-        </div>
-        {% endfor %}
-      {% else %}
-        <p class="text-muted mb-0">No channels.</p>
-      {% endif %}
+          {% endfor %}
+        {% else %}
+          <p class="text-muted mb-0 mt-2">No channels.</p>
+        {% endif %}
+      </div>
     </div>
   </div>
   {% endfor %}

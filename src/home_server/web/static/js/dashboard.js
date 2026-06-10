@@ -64,6 +64,48 @@
       currentWindow = activeBtn ? activeBtn.getAttribute("data-window") : "1m";
     }
 
+    // Collapse persistence: read/write collapsed device ids to localStorage.
+    var COLLAPSE_KEY = "dashboard.collapsed";
+    var collapsedIds;
+    try {
+      collapsedIds = JSON.parse(localStorage.getItem(COLLAPSE_KEY) || "[]");
+      if (!Array.isArray(collapsedIds)) collapsedIds = [];
+    } catch (e) {
+      collapsedIds = [];
+    }
+
+    // Apply persisted collapsed state before charts are created to avoid
+    // animation flash and zero-size canvases on load.
+    document.querySelectorAll("[data-device-collapse]").forEach(function (el) {
+      var deviceId = String(el.getAttribute("data-device-collapse"));
+      var targetId = el.id;
+      var btn = document.querySelector('[data-bs-target="#' + targetId + '"]');
+      if (collapsedIds.indexOf(deviceId) !== -1) {
+        el.classList.remove("show");
+        if (btn) {
+          btn.classList.add("collapsed");
+          btn.setAttribute("aria-expanded", "false");
+        }
+      }
+      // Listen for Bootstrap collapse events to update localStorage.
+      el.addEventListener("shown.bs.collapse", function () {
+        collapsedIds = collapsedIds.filter(function (id) { return id !== deviceId; });
+        localStorage.setItem(COLLAPSE_KEY, JSON.stringify(collapsedIds));
+        // Resize charts inside the newly expanded block so zero-size canvases
+        // (collapsed at page load) render correctly.
+        el.querySelectorAll("canvas[data-channel-id]").forEach(function (cv) {
+          var cid = parseInt(cv.getAttribute("data-channel-id"), 10);
+          if (charts[cid]) charts[cid].resize();
+        });
+      });
+      el.addEventListener("hidden.bs.collapse", function () {
+        if (collapsedIds.indexOf(deviceId) === -1) {
+          collapsedIds.push(deviceId);
+        }
+        localStorage.setItem(COLLAPSE_KEY, JSON.stringify(collapsedIds));
+      });
+    });
+
     var canvases = document.querySelectorAll("canvas[data-channel-id]");
     var charts = {};
 
