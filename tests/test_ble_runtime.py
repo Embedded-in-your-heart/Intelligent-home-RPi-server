@@ -84,6 +84,24 @@ def test_activate_connects_and_subscribes_only_display(db_path: Path) -> None:
         ble.simulate_notify(ADDR, CTRL_UUID, b"\x01")
 
 
+def test_activate_skips_channel_with_missing_characteristic(db_path: Path) -> None:
+    # A display channel whose char_uuid is absent from the peripheral (e.g. a
+    # characteristic removed from firmware, like the retired SoundClass 1A220009)
+    # must not crash bring-up: the bad channel is logged and skipped, and every
+    # other display channel on the device still gets subscribed.
+    ble = MockBLEManager()
+    ble.fail_subscribe_for = {ENUM_UUID}
+    rt, _ = _runtime(db_path, ble)
+    rt.activate()  # must not raise
+    assert ble.is_connected(ADDR)
+    # The healthy channels are still subscribed despite the bad one in the middle.
+    ble.simulate_notify(ADDR, DISP_UUID, b"\x2a")  # no error
+    ble.simulate_notify(ADDR, MG_UUID, b"\x00\x00\x00\x00")  # subscribed after ENUM
+    # The failed channel is not subscribed.
+    with pytest.raises(MockBLEError):
+        ble.simulate_notify(ADDR, ENUM_UUID, b"\x01")
+
+
 def test_notify_persists_reading_and_calls_on_reading(db_path: Path) -> None:
     ble = MockBLEManager()
     rt, seen = _runtime(db_path, ble)

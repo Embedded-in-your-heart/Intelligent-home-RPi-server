@@ -117,8 +117,21 @@ class BleRuntime:
         self, conn: sqlite3.Connection, device: Device
     ) -> None:
         for channel in channels.list_by_device(conn, device.id):
-            if channel.type == "display":
+            if channel.type != "display":
+                continue
+            try:
                 self.subscribe_channel(device.address, channel)
+            except Exception:
+                # One channel's subscribe failing (e.g. a char_uuid absent from
+                # the peripheral's GATT table after a firmware change) must not
+                # abort bring-up for the rest of the device or other devices.
+                log.warning(
+                    "subscribe channel %d (%s) on %s failed; skipping",
+                    channel.id,
+                    channel.char_uuid,
+                    device.address,
+                    exc_info=True,
+                )
 
     def on_channel_added(self, device: Device, channel: Channel) -> None:
         """Subscribe a freshly created display channel on an already-live link.

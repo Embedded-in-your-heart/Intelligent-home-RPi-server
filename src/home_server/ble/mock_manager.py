@@ -26,6 +26,9 @@ class MockBLEError(Exception):
 class MockBLEManager:
     scan_results: list[DiscoveredDevice] = field(default_factory=list)
     fail_connect_for: set[str] = field(default_factory=set)
+    # char_uuids for which subscribe() raises, modelling a characteristic that
+    # is absent from the peripheral's GATT table (bluepy ATTR_NOT_FOUND).
+    fail_subscribe_for: set[str] = field(default_factory=set)
     # When set, start_scan() raises this instead of returning results, so tests
     # can exercise the web layer's scan error handling.
     scan_error: Exception | None = None
@@ -103,6 +106,10 @@ class MockBLEManager:
         callback: NotifyCallback,
     ) -> None:
         self._require_connected(handle)
+        if char_uuid in self.fail_subscribe_for:
+            raise MockBLEError(
+                f"Mocked subscribe failure for {char_uuid} on {handle}"
+            )
         self._subscriptions[(handle, char_uuid)] = callback
 
     def unsubscribe(self, handle: ConnectionHandle, char_uuid: str) -> None:
