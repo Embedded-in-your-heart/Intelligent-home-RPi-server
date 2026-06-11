@@ -112,7 +112,7 @@ sudo crontab -l                  # 確認已安裝的 @reboot 項目
 | 1A22000A | 警報聲偵測 | display | 0/1 |
 | 1A22000B | 音量 dB(A) | display | dBA |
 | 1A22000C | 震動強度 (mg) | display | mg |
-| 1A22000D | 家電運轉 | display | 0/1 |
+| 1A22000D | 震動偵測 | display | 0/1 |
 | 1A22000E | 地震警報 | display | 0/1 |
 
 Mock feed 模擬模式：dBA 頻道以正弦波產生浮點數、mg 頻道以隨機值模擬震動、0/1 頻道定期翻轉。

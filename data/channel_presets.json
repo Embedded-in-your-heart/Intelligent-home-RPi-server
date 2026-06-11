@@ -11,6 +11,6 @@
   {"label": "警報聲偵測", "char_uuid": "1A22000A-8E22-4541-9D4C-21EDAE82ED19", "type": "display", "data_format": "uint8", "unit": "0/1"},
   {"label": "音量 dB(A)", "char_uuid": "1A22000B-8E22-4541-9D4C-21EDAE82ED19", "type": "display", "data_format": "float32_le", "unit": "dBA"},
   {"label": "震動強度 (mg)", "char_uuid": "1A22000C-8E22-4541-9D4C-21EDAE82ED19", "type": "display", "data_format": "float32_le", "unit": "mg"},
-  {"label": "家電運轉", "char_uuid": "1A22000D-8E22-4541-9D4C-21EDAE82ED19", "type": "display", "data_format": "uint8", "unit": "0/1"},
+  {"label": "震動偵測", "char_uuid": "1A22000D-8E22-4541-9D4C-21EDAE82ED19", "type": "display", "data_format": "uint8", "unit": "0/1"},
   {"label": "地震警報", "char_uuid": "1A22000E-8E22-4541-9D4C-21EDAE82ED19", "type": "display", "data_format": "uint8", "unit": "0/1"}
 ]
